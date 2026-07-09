@@ -39,3 +39,7 @@ OPENROUTER_FALLBACK_MODELS: list[str] = [
 # App
 APP_ENV: str = os.getenv("APP_ENV", "development")
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+# Render
+RENDER_EXTERNAL_URL: str = os.getenv("RENDER_EXTERNAL_URL", "")
+PORT: int = int(os.getenv("PORT", "8000"))
