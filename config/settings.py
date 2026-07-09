@@ -34,6 +34,8 @@ OPENROUTER_FALLBACK_MODELS: list[str] = [
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
     "meta-llama/llama-4-scout:free",
     "mistralai/mistral-7b-instruct:free",
+    # Paid fallback: only used when all free models are unavailable
+    "deepseek/deepseek-r1",
 ]
 
 # App
