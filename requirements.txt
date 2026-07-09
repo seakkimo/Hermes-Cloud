@@ -1,0 +1,8 @@
+# Telegram Bot
+python-telegram-bot==21.6
+
+# LLM via OpenRouter (uses OpenAI-compatible API)
+openai>=1.57.0
+
+# Config
+python-dotenv==1.0.1
