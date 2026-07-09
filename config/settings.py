@@ -65,6 +65,11 @@ OPENROUTER_FALLBACK_MODELS: list[str] = [
 APP_ENV: str = os.getenv("APP_ENV", "development")
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+# Memory (Supabase)
+SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+MEMORY_MAX_MESSAGES: int = int(os.getenv("MEMORY_MAX_MESSAGES", "20"))
+
 # Render
 RENDER_EXTERNAL_URL: str = os.getenv("RENDER_EXTERNAL_URL", "")
 PORT: int = int(os.getenv("PORT", "8000"))
