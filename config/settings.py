@@ -12,7 +12,19 @@ OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 OPENROUTER_DEFAULT_MODEL: str = os.getenv(
     "OPENROUTER_DEFAULT_MODEL", "google/gemma-4-31b-it:free"
 )
-# Fallback chain: tried in order when primary model returns 429/404
+# Model alias map: short name → full OpenRouter model ID
+MODEL_ALIASES: dict[str, str] = {
+    "gemma": "google/gemma-4-31b-it:free",
+    "gemma3": "google/gemma-3-27b-it:free",
+    "gemma4": "google/gemma-4-26b-a4b-it:free",
+    "llama": "meta-llama/llama-4-scout:free",
+    "mistral": "mistralai/mistral-7b-instruct:free",
+    "deepseek": "deepseek/deepseek-r1",
+    "qwen": "qwen/qwen3-coder:free",
+    "gpt120": "openai/gpt-oss-120b:free",
+    "gpt20": "openai/gpt-oss-20b:free",
+    "nemotron": "nvidia/nemotron-3-ultra-550b-a55b:free",
+}
 OPENROUTER_FALLBACK_MODELS: list[str] = [
     "google/gemma-4-31b-it:free",
     "google/gemma-3-27b-it:free",

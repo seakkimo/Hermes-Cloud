@@ -1,4 +1,5 @@
 from src.llm.openrouter import chat
+from src.agent.session import get_model
 
 SYSTEM_PROMPT = (
     "You are Hermes, a personal AI assistant. "
@@ -6,14 +7,10 @@ SYSTEM_PROMPT = (
 )
 
 
-async def run(user_message: str) -> str:
-    """
-    Agent entry point.
-    V0.1: simple pass-through to LLM.
-    Future: tool calling, memory, multi-agent routing.
-    """
+async def run(user_message: str, user_id: int = 0) -> str:
+    model = get_model(user_id)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_message},
     ]
-    return await chat(messages)
+    return await chat(messages, model=model)
