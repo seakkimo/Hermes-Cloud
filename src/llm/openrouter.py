@@ -15,9 +15,8 @@ _client = AsyncOpenAI(
 )
 
 
-async def chat(messages: list[dict], model: str = OPENROUTER_DEFAULT_MODEL) -> str:
-    # Build fallback chain: preferred model first, then the rest
-    candidates = [model] + [m for m in OPENROUTER_FALLBACK_MODELS if m != model]
+async def chat(messages: list[dict], model: str = OPENROUTER_DEFAULT_MODEL, fallback: bool = True) -> str:
+    candidates = [model] + [m for m in OPENROUTER_FALLBACK_MODELS if m != model] if fallback else [model]
 
     for candidate in candidates:
         try:
@@ -28,6 +27,8 @@ async def chat(messages: list[dict], model: str = OPENROUTER_DEFAULT_MODEL) -> s
             )
             return response.choices[0].message.content
         except (RateLimitError, NotFoundError) as e:
+            if not fallback:
+                raise
             logger.warning(f"Model {candidate} unavailable ({e.status_code}), trying next...")
 
     raise RuntimeError("All models in fallback chain are unavailable.")
