@@ -1,0 +1,23 @@
+name: Scheduler
+
+on:
+  schedule:
+    # 00:00 UTC = 08:00 UTC+8
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Task name to run"
+        required: true
+        default: "daily_summary"
+
+jobs:
+  run_task:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger task on Render
+        run: |
+          curl -f -X POST ${{ secrets.RENDER_URL }}/task \
+            -H "Content-Type: application/json" \
+            -H "x-scheduler-secret: ${{ secrets.SCHEDULER_SECRET }}" \
+            -d '{"task": "daily_summary"}'

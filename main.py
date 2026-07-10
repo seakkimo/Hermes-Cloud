@@ -1,8 +1,8 @@
 import logging
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Header, HTTPException
 from telegram import Update
-from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT
+from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT, SCHEDULER_SECRET
 from src.telegram.bot import build_app
 
 logging.basicConfig(
@@ -26,6 +26,21 @@ def run_webhook():
     @web.get("/health")
     async def health():
         return {"status": "ok"}
+
+    @web.get("/ping")
+    async def ping():
+        logger.info("Keep-alive ping received")
+        return {"status": "alive"}
+
+    @web.post("/task")
+    async def task(request: Request, x_scheduler_secret: str = Header(default="")):
+        if x_scheduler_secret != SCHEDULER_SECRET:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        data = await request.json()
+        task_name = data.get("task")
+        logger.info(f"Scheduler task received: {task_name}")
+        # Future: route to task handlers
+        return {"status": "received", "task": task_name}
 
     @web.post("/webhook")
     async def webhook(request: Request):
