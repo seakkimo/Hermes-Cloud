@@ -12,3 +12,10 @@ jobs:
       - name: Ping Render
         run: |
           curl -f ${{ secrets.RENDER_URL }}/ping || echo "Ping failed"
+
+      - name: Ping Supabase
+        run: |
+          curl -f "${{ secrets.SUPABASE_URL }}/rest/v1/conversations?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            || echo "Supabase ping failed"
