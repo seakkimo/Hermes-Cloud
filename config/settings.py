@@ -72,6 +72,9 @@ MEMORY_MAX_MESSAGES: int = int(os.getenv("MEMORY_MAX_MESSAGES", "20"))
 
 # Scheduler
 SCHEDULER_SECRET: str = os.getenv("SCHEDULER_SECRET", "")
+TELEGRAM_OWNER_CHAT_ID: int = int(os.getenv("TELEGRAM_OWNER_CHAT_ID", "0"))
+
+# Render
 
 # Render
 RENDER_EXTERNAL_URL: str = os.getenv("RENDER_EXTERNAL_URL", "")

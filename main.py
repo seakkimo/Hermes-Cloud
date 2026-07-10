@@ -2,7 +2,7 @@ import logging
 import uvicorn
 from fastapi import FastAPI, Request, Header, HTTPException
 from telegram import Update
-from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT, SCHEDULER_SECRET
+from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT, SCHEDULER_SECRET, TELEGRAM_OWNER_CHAT_ID
 from src.telegram.bot import build_app
 
 logging.basicConfig(
@@ -39,8 +39,17 @@ def run_webhook():
         data = await request.json()
         task_name = data.get("task")
         logger.info(f"Scheduler task received: {task_name}")
-        # Future: route to task handlers
-        return {"status": "received", "task": task_name}
+
+        if task_name == "news":
+            from src.tools.news import run as news_run
+            summary = await news_run()
+            await tg_app.bot.send_message(
+                chat_id=TELEGRAM_OWNER_CHAT_ID,
+                text=summary,
+                parse_mode="Markdown",
+            )
+
+        return {"status": "ok", "task": task_name}
 
     @web.post("/webhook")
     async def webhook(request: Request):

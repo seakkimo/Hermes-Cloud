@@ -20,4 +20,4 @@ jobs:
           curl -f -X POST ${{ secrets.RENDER_URL }}/task \
             -H "Content-Type: application/json" \
             -H "x-scheduler-secret: ${{ secrets.SCHEDULER_SECRET }}" \
-            -d '{"task": "daily_summary"}'
+            -d '{"task": "news"}'
