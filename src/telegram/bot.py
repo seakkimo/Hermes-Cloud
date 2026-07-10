@@ -14,8 +14,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "👋 Hermes online. Send me a message to begin.\n"
         "Use /model list to see available models.\n"
         "Use /model <name> to switch models.\n"
-        "Use /clear to clear conversation memory."
+        "Use /clear to clear conversation memory.\n"
+        "Use /browse <url> to fetch a webpage."
     )
+
+
+async def browse_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text("Usage: /browse <url>")
+        return
+    url = context.args[0]
+    user_id = update.effective_user.id
+    await update.message.chat.send_action("typing")
+    try:
+        reply = await run("", user_id=user_id, force_browse=url)
+        if not reply:
+            reply = await run(f"請摘要這個網頁的內容：{url}", user_id=user_id, force_browse=url)
+    except Exception as e:
+        logger.error(f"Browse error: {e}")
+        reply = "⚠️ 無法讀取該網頁，請確認網址是否正確。"
+    await update.message.reply_text(reply)
 
 
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -77,5 +95,6 @@ def build_app():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("model", model_command))
     app.add_handler(CommandHandler("clear", clear_command))
+    app.add_handler(CommandHandler("browse", browse_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return app
