@@ -1,0 +1,18 @@
+name: Paper Agent
+
+on:
+  schedule:
+    # 00:30 UTC = 08:30 UTC+8
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  run_task:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger paper task on Render
+        run: |
+          curl -f -X POST ${{ secrets.RENDER_URL }}/task \
+            -H "Content-Type: application/json" \
+            -H "x-scheduler-secret: ${{ secrets.SCHEDULER_SECRET }}" \
+            -d '{"task": "paper"}'

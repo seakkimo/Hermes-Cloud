@@ -49,6 +49,15 @@ def run_webhook():
                 parse_mode="Markdown",
             )
 
+        elif task_name == "paper":
+            from src.tools.paper import run as paper_run
+            summary = await paper_run()
+            await tg_app.bot.send_message(
+                chat_id=TELEGRAM_OWNER_CHAT_ID,
+                text=summary,
+                parse_mode="Markdown",
+            )
+
         return {"status": "ok", "task": task_name}
 
     @web.post("/webhook")
