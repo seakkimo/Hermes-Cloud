@@ -11,19 +11,22 @@ MAX_PAPERS_PER_TOPIC = 3
 
 
 def _fetch_papers(query: str, max_results: int = MAX_PAPERS_PER_TOPIC) -> list[dict]:
-    client = arxiv.Client()
+    client = arxiv.Client(num_retries=1, delay_seconds=3)
     search = arxiv.Search(
         query=query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.SubmittedDate,
     )
     papers = []
-    for result in client.results(search):
-        papers.append({
-            "title": result.title,
-            "summary": result.summary[:300],
-            "url": result.entry_id,
-        })
+    try:
+        for result in client.results(search):
+            papers.append({
+                "title": result.title,
+                "summary": result.summary[:300],
+                "url": result.entry_id,
+            })
+    except Exception:
+        pass
     return papers
 
 

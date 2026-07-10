@@ -51,12 +51,15 @@ def run_webhook():
 
         elif task_name == "paper":
             from src.tools.paper import run as paper_run
-            summary = await paper_run()
-            await tg_app.bot.send_message(
-                chat_id=TELEGRAM_OWNER_CHAT_ID,
-                text=summary,
-                parse_mode="Markdown",
-            )
+            try:
+                summary = await paper_run()
+                await tg_app.bot.send_message(
+                    chat_id=TELEGRAM_OWNER_CHAT_ID,
+                    text=summary,
+                    parse_mode="Markdown",
+                )
+            except Exception as e:
+                logger.error(f"Paper task error: {e}")
 
         return {"status": "ok", "task": task_name}
 
