@@ -21,18 +21,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def browse_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
-        await update.message.reply_text("Usage: /browse <url>")
+        await update.message.reply_text(
+            "Usage:\n"
+            "`/browse <url>` — fetch a webpage\n"
+            "`/browse <keywords>` — search the web",
+            parse_mode="Markdown"
+        )
         return
-    url = context.args[0]
+
+    query = " ".join(context.args)
     user_id = update.effective_user.id
     await update.message.chat.send_action("typing")
+
+    is_url = query.startswith("http://") or query.startswith("https://")
+
     try:
-        reply = await run("", user_id=user_id, force_browse=url)
+        if is_url:
+            reply = await run(f"請摘要這個網頁的主要內容：{query}", user_id=user_id, force_browse=query)
+        else:
+            # Treat as search query
+            reply = await run(query, user_id=user_id, force_search=True)
         if not reply:
-            reply = await run(f"請摘要這個網頁的內容：{url}", user_id=user_id, force_browse=url)
+            reply = "⚠️ 無法取得內容。"
     except Exception as e:
         logger.error(f"Browse error: {e}")
-        reply = "⚠️ 無法讀取該網頁，請確認網址是否正確。"
+        reply = "⚠️ 發生錯誤，請稍後再試。"
     await update.message.reply_text(reply)
 
 

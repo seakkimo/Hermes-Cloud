@@ -11,22 +11,17 @@ SYSTEM_PROMPT = (
     "Be concise, helpful, and honest."
 )
 
-SEARCH_DECISION_PROMPT = (
-    "判斷以下問題是否需要搜尋網路才能回答（即時資訊、特定網站、最新消息、不確定的事實）。"
-    "只回答 YES 或 NO，不要其他文字。"
-)
+SEARCH_KEYWORDS = [
+    "今天", "今日", "最新", "最近", "現在", "目前",
+    "新聞", "消息", "動態", "資訊",
+    "搜尋", "查一下", "幫我找", "幫我查", "查詢",
+    "latest", "recent", "today", "news", "search", "find",
+]
 
 
-async def _needs_search(user_message: str) -> bool:
-    messages = [
-        {"role": "system", "content": SEARCH_DECISION_PROMPT},
-        {"role": "user", "content": user_message},
-    ]
-    try:
-        result = await chat(messages)
-        return result.strip().upper().startswith("YES")
-    except Exception:
-        return False
+def _needs_search(user_message: str) -> bool:
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
 
 
 async def _run_search(query: str) -> str:
@@ -40,12 +35,11 @@ async def _run_search(query: str) -> str:
     return context
 
 
-async def run(user_message: str, user_id: int = 0, force_browse: str = "") -> str:
+async def run(user_message: str, user_id: int = 0, force_browse: str = "", force_search: bool = False) -> str:
     history = await load_history(user_id)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages += history
 
-    # Force browse mode: /browse <url>
     if force_browse:
         page_content = await fetch_page(force_browse)
         messages.append({
@@ -53,10 +47,9 @@ async def run(user_message: str, user_id: int = 0, force_browse: str = "") -> st
             "content": f"以下是網頁內容：\n\n{page_content}\n\n{user_message}",
         })
     else:
-        # Auto-detect if search is needed
-        needs_web = await _needs_search(user_message)
+        needs_web = force_search or _needs_search(user_message)
         if needs_web:
-            logger.info(f"Auto search triggered for: {user_message}")
+            logger.info(f"Search triggered for: {user_message}")
             search_context = await _run_search(user_message)
             messages.append({
                 "role": "user",
