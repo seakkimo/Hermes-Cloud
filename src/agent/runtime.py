@@ -25,14 +25,20 @@ def _needs_search(user_message: str) -> bool:
 
 
 async def _run_search(query: str) -> str:
-    results = search(query)
+    import urllib.parse
+    from src.tools.browser import _async_search
+    try:
+        encoded = urllib.parse.quote(query)
+        results = await _async_search(encoded)
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        results = []
     if not results:
         return "（搜尋無結果）"
-    context = "\n\n".join(
+    return "\n\n".join(
         f"標題：{r['title']}\n網址：{r['url']}\n摘要：{r['snippet']}"
         for r in results
     )
-    return context
 
 
 async def run(user_message: str, user_id: int = 0, force_browse: str = "", force_search: bool = False) -> str:
