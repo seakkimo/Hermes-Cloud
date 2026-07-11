@@ -23,7 +23,38 @@ def run_webhook():
     tg_app = build_app()
     web = FastAPI()
 
-    @web.get("/health")
+    # MCP Server
+    from src.mcp.registry import list_tools, call_tool
+    from src.mcp import tools as mcp_tools
+    mcp_tools.setup()
+
+    @web.get("/mcp")
+    async def mcp_info():
+        return {
+            "name": "hermes",
+            "version": "0.8.0",
+            "description": "Hermes Personal AI OS - MCP Server",
+        }
+
+    @web.post("/mcp")
+    async def mcp_endpoint(request: Request):
+        body = await request.json()
+        method = body.get("method")
+
+        if method == "tools/list":
+            return {"tools": list_tools()}
+
+        if method == "tools/call":
+            name = body.get("params", {}).get("name")
+            arguments = body.get("params", {}).get("arguments", {})
+            try:
+                result = await call_tool(name, arguments)
+                return {"content": [{"type": "text", "text": str(result)}]}
+            except Exception as e:
+                return {"error": str(e)}
+
+        return {"error": f"Unknown method: {method}"}
+
     async def health():
         return {"status": "ok"}
 
