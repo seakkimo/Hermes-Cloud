@@ -41,6 +41,16 @@ def run_webhook():
         body = await request.json()
         method = body.get("method")
 
+        if method == "initialize":
+            return {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "hermes", "version": "0.8.0"},
+            }
+
+        if method == "notifications/initialized":
+            return {}
+
         if method == "tools/list":
             return {"tools": list_tools()}
 
@@ -55,6 +65,7 @@ def run_webhook():
 
         return {"error": f"Unknown method: {method}"}
 
+    @web.get("/health")
     async def health():
         return {"status": "ok"}
 
