@@ -1,6 +1,9 @@
 import logging
+import json
+import asyncio
 import uvicorn
 from fastapi import FastAPI, Request, Header, HTTPException
+from fastapi.responses import StreamingResponse
 from telegram import Update
 from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT, SCHEDULER_SECRET, TELEGRAM_OWNER_CHAT_ID
 from src.telegram.bot import build_app
@@ -28,17 +31,7 @@ def run_webhook():
     from src.mcp import tools as mcp_tools
     mcp_tools.setup()
 
-    @web.get("/mcp")
-    async def mcp_info():
-        return {
-            "name": "hermes",
-            "version": "0.8.0",
-            "description": "Hermes Personal AI OS - MCP Server",
-        }
-
-    @web.post("/mcp")
-    async def mcp_endpoint(request: Request):
-        body = await request.json()
+    async def _handle_mcp_body(body: dict) -> dict:
         req_id = body.get("id")
         method = body.get("method")
 
@@ -55,8 +48,8 @@ def run_webhook():
                 "serverInfo": {"name": "hermes", "version": "0.8.0"},
             })
 
-        if method == "notifications/initialized":
-            return {}
+        if method in ("notifications/initialized", "ping"):
+            return {"jsonrpc": "2.0", "id": req_id, "result": {}}
 
         if method == "tools/list":
             return ok({"tools": list_tools()})
@@ -71,6 +64,30 @@ def run_webhook():
                 return err(-32000, str(e))
 
         return err(-32601, f"Method not found: {method}")
+
+    @web.get("/mcp")
+    async def mcp_sse(request: Request):
+        """SSE endpoint for Cline streamable-http transport"""
+        async def event_stream():
+            # Send endpoint event so client knows where to POST
+            yield f"event: endpoint\ndata: /mcp\n\n"
+            # Keep alive
+            while True:
+                if await request.is_disconnected():
+                    break
+                yield ": keep-alive\n\n"
+                await asyncio.sleep(15)
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @web.post("/mcp")
+    async def mcp_endpoint(request: Request):
+        body = await request.json()
+        return await _handle_mcp_body(body)
 
     @web.get("/health")
     async def health():
