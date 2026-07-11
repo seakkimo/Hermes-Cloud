@@ -39,31 +39,38 @@ def run_webhook():
     @web.post("/mcp")
     async def mcp_endpoint(request: Request):
         body = await request.json()
+        req_id = body.get("id")
         method = body.get("method")
 
+        def ok(result):
+            return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+        def err(code, message):
+            return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
         if method == "initialize":
-            return {
+            return ok({
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "hermes", "version": "0.8.0"},
-            }
+            })
 
         if method == "notifications/initialized":
             return {}
 
         if method == "tools/list":
-            return {"tools": list_tools()}
+            return ok({"tools": list_tools()})
 
         if method == "tools/call":
             name = body.get("params", {}).get("name")
             arguments = body.get("params", {}).get("arguments", {})
             try:
                 result = await call_tool(name, arguments)
-                return {"content": [{"type": "text", "text": str(result)}]}
+                return ok({"content": [{"type": "text", "text": str(result)}]})
             except Exception as e:
-                return {"error": str(e)}
+                return err(-32000, str(e))
 
-        return {"error": f"Unknown method: {method}"}
+        return err(-32601, f"Method not found: {method}")
 
     @web.get("/health")
     async def health():
