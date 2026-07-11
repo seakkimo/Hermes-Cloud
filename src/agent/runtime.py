@@ -2,7 +2,7 @@ import logging
 from src.llm.openrouter import chat
 from src.agent.session import get_model, is_auto
 from src.memory.supabase import load_history, save_message
-from src.tools.browser import search, fetch_page
+from src.tools.browser import fetch_page
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +25,8 @@ def _needs_search(user_message: str) -> bool:
 
 
 async def _run_search(query: str) -> str:
-    import urllib.parse
-    from src.tools.browser import _async_search
-    try:
-        encoded = urllib.parse.quote(query)
-        results = await _async_search(encoded)
-    except Exception as e:
-        logger.error(f"Search error: {e}")
-        results = []
+    from src.tools.browser import search
+    results = await search(query)
     if not results:
         return "（搜尋無結果）"
     return "\n\n".join(
