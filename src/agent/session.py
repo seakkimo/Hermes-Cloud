@@ -1,9 +1,9 @@
-from config.settings import OPENROUTER_DEFAULT_MODEL
+from config.settings import OPENROUTER_DEFAULT_MODEL, DEFAULT_SEARCH_ENGINE
 
 # Sentinel value to indicate auto/fallback mode
 AUTO_MODEL = "__auto__"
 
-# In-memory store: {user_id: {"model": "..."}}
+# In-memory store: {user_id: {"model": "...", "search_engine": "..."}}
 _sessions: dict[int, dict] = {}
 
 
@@ -17,3 +17,11 @@ def set_model(user_id: int, model: str) -> None:
 
 def is_auto(user_id: int) -> bool:
     return get_model(user_id) == AUTO_MODEL
+
+
+def get_search_engine(user_id: int) -> str:
+    return _sessions.get(user_id, {}).get("search_engine", DEFAULT_SEARCH_ENGINE)
+
+
+def set_search_engine(user_id: int, engine: str) -> None:
+    _sessions.setdefault(user_id, {})["search_engine"] = engine

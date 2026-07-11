@@ -3,8 +3,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from config.settings import TELEGRAM_BOT_TOKEN, MODEL_ALIASES
 from src.agent.runtime import run
-from src.agent.session import get_model, set_model, AUTO_MODEL
+from src.agent.session import get_model, set_model, AUTO_MODEL, get_search_engine, set_search_engine
 from src.memory.supabase import clear_history
+from src.tools.browser import SEARCH_ENGINES
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "👋 Hermes online. Send me a message to begin.\n"
         "Use /model list to see available models.\n"
         "Use /model <name> to switch models.\n"
+        "Use /search list to see available search engines.\n"
+        "Use /search <engine> to switch search engine.\n"
         "Use /clear to clear conversation memory.\n"
-        "Use /browse <url> to fetch a webpage."
+        "Use /browse <url or keywords> to search or fetch a webpage."
     )
+
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    args = context.args
+
+    if not args or args[0] == "list":
+        current = get_search_engine(user_id)
+        lines = [f"Current engine: `{current}`\n", "Available engines:"]
+        lines += [f"  `{e}`" for e in SEARCH_ENGINES]
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        return
+
+    engine = args[0].lower()
+    if engine not in SEARCH_ENGINES:
+        await update.message.reply_text(
+            f"❌ Unknown engine `{engine}`. Available: {', '.join(SEARCH_ENGINES)}",
+            parse_mode="Markdown"
+        )
+        return
+
+    set_search_engine(user_id, engine)
+    await update.message.reply_text(f"✅ Search engine switched to `{engine}`", parse_mode="Markdown")
 
 
 async def browse_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -107,6 +133,7 @@ def build_app():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("model", model_command))
+    app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler("clear", clear_command))
     app.add_handler(CommandHandler("browse", browse_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

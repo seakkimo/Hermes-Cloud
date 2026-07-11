@@ -1,6 +1,6 @@
 import logging
 from src.llm.openrouter import chat
-from src.agent.session import get_model, is_auto
+from src.agent.session import get_model, is_auto, get_search_engine
 from src.memory.supabase import load_history, save_message
 from src.tools.browser import fetch_page
 
@@ -24,9 +24,9 @@ def _needs_search(user_message: str) -> bool:
     return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
 
 
-async def _run_search(query: str) -> str:
+async def _run_search(query: str, engine: str = "tavily") -> str:
     from src.tools.browser import search
-    results = await search(query)
+    results = await search(query, engine=engine)
     if not results:
         return "（搜尋無結果）"
     return "\n\n".join(
@@ -49,8 +49,9 @@ async def run(user_message: str, user_id: int = 0, force_browse: str = "", force
     else:
         needs_web = force_search or _needs_search(user_message)
         if needs_web:
-            logger.info(f"Search triggered for: {user_message}")
-            search_context = await _run_search(user_message)
+            engine = get_search_engine(user_id)
+            logger.info(f"Search triggered [{engine}]: {user_message}")
+            search_context = await _run_search(user_message, engine=engine)
             messages.append({
                 "role": "user",
                 "content": f"以下是網路搜尋結果，請根據這些資料回答問題：\n\n{search_context}\n\n問題：{user_message}",

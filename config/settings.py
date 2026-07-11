@@ -70,6 +70,10 @@ SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
 MEMORY_MAX_MESSAGES: int = int(os.getenv("MEMORY_MAX_MESSAGES", "20"))
 
+# Search
+TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+DEFAULT_SEARCH_ENGINE: str = os.getenv("DEFAULT_SEARCH_ENGINE", "tavily")
+
 # Scheduler
 SCHEDULER_SECRET: str = os.getenv("SCHEDULER_SECRET", "")
 TELEGRAM_OWNER_CHAT_ID: int = int(os.getenv("TELEGRAM_OWNER_CHAT_ID", "0"))
