@@ -10,6 +10,7 @@ python-dotenv==1.0.1
 # Webhook server
 fastapi==0.115.5
 uvicorn==0.32.1
+websockets==13.1
 
 # Memory (Supabase)
 supabase==2.10.0

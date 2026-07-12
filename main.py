@@ -2,7 +2,7 @@ import logging
 import json
 import asyncio
 import uvicorn
-from fastapi import FastAPI, Request, Header, HTTPException
+from fastapi import FastAPI, Request, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from telegram import Update
 from config.settings import LOG_LEVEL, APP_ENV, RENDER_EXTERNAL_URL, PORT, SCHEDULER_SECRET, TELEGRAM_OWNER_CHAT_ID
@@ -89,7 +89,44 @@ def run_webhook():
         body = await request.json()
         return await _handle_mcp_body(body)
 
-    @web.get("/health")
+    # Robot Bridge WebSocket
+    _robot_ws: WebSocket | None = None
+
+    @web.websocket("/ws/robot")
+    async def robot_ws(websocket: WebSocket):
+        nonlocal _robot_ws
+        await websocket.accept()
+        _robot_ws = websocket
+        logger.info("Robot Bridge connected")
+        try:
+            while True:
+                data = await websocket.receive_text()
+                logger.info(f"Robot status: {data}")
+        except WebSocketDisconnect:
+            _robot_ws = None
+            logger.info("Robot Bridge disconnected")
+
+    async def send_robot_command(command: dict) -> str:
+        if _robot_ws is None:
+            return "Robot Bridge not connected"
+        await _robot_ws.send_text(json.dumps(command))
+        return f"Command sent: {command}"
+
+    # Register robot tool in MCP
+    from src.mcp.registry import Tool, register
+    register(Tool(
+        name="robot_command",
+        description="Send a command to the robot via Bridge Agent",
+        func=send_robot_command,
+        parameters={
+            "command": {"type": "object", "description": "Command dict, e.g. {\"action\": \"move\", \"direction\": \"forward\"}"},
+        },
+    ))
+
+    @web.get("/ws/robot/status")
+    async def robot_status():
+        return {"connected": _robot_ws is not None}
+
     async def health():
         return {"status": "ok"}
 
