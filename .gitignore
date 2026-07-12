@@ -18,6 +18,9 @@ build/
 # Logs
 *.log
 
+# Amazon Q chat logs
+q-dev-chat-*.md
+
 # OS
 .DS_Store
 Thumbs.db
