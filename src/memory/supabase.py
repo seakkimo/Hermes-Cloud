@@ -16,6 +16,14 @@ def _get_client() -> Client | None:
     return _client
 
 
+def get_supabase_client() -> Client:
+    """Public accessor for other modules."""
+    c = _get_client()
+    if not c:
+        raise RuntimeError("Supabase not configured")
+    return c
+
+
 async def load_history(user_id: int) -> list[dict]:
     client = _get_client()
     if not client:
@@ -57,3 +65,45 @@ async def clear_history(user_id: int) -> None:
         client.table("conversations").delete().eq("user_id", user_id).execute()
     except Exception as e:
         logger.error(f"Memory clear error: {e}")
+
+
+# ── Model registry (dynamic) ──────────────────────────────────────────────────
+
+async def db_list_models() -> list[dict]:
+    client = _get_client()
+    if not client:
+        return []
+    result = client.table("models").select("*").order("priority").execute()
+    return result.data or []
+
+
+async def db_add_model(
+    alias: str, model_id: str, provider: str,
+    base_url: str, api_key: str, priority: int
+) -> None:
+    client = _get_client()
+    if not client:
+        return
+    client.table("models").upsert({
+        "alias": alias,
+        "model_id": model_id,
+        "provider": provider,
+        "base_url": base_url,
+        "api_key": api_key,
+        "priority": priority,
+        "is_active": True,
+    }, on_conflict="alias").execute()
+
+
+async def db_remove_model(alias: str) -> None:
+    client = _get_client()
+    if not client:
+        return
+    client.table("models").delete().eq("alias", alias).execute()
+
+
+async def db_toggle_model(alias: str, is_active: bool) -> None:
+    client = _get_client()
+    if not client:
+        return
+    client.table("models").update({"is_active": is_active}).eq("alias", alias).execute()

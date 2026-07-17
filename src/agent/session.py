@@ -1,4 +1,5 @@
 from config.settings import OPENROUTER_DEFAULT_MODEL, DEFAULT_SEARCH_ENGINE
+from src.llm.llm import get_model_by_alias, invalidate_cache
 
 # Sentinel value to indicate auto/fallback mode
 AUTO_MODEL = "__auto__"
@@ -17,7 +18,6 @@ def set_model(user_id: int, model: str) -> None:
 
 def is_auto(user_id: int) -> bool:
     return get_model(user_id) == AUTO_MODEL
-
 
 def get_search_engine(user_id: int) -> str:
     return _sessions.get(user_id, {}).get("search_engine", DEFAULT_SEARCH_ENGINE)

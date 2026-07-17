@@ -1,5 +1,5 @@
 import feedparser
-from src.llm.openrouter import chat
+from src.llm.llm import chat
 
 FEEDS = {
     "AI": "https://news.google.com/rss/search?q=artificial+intelligence&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",

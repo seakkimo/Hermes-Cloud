@@ -1,5 +1,5 @@
 import logging
-from src.llm.openrouter import chat
+from src.llm.llm import chat
 from src.agent.session import get_model, is_auto, get_search_engine
 from src.memory.supabase import load_history, save_message
 from src.tools.browser import fetch_page
@@ -62,8 +62,8 @@ async def run(user_message: str, user_id: int = 0, force_browse: str = "", force
     if is_auto(user_id):
         reply = await chat(messages)
     else:
-        model = get_model(user_id)
-        reply = await chat(messages, model=model, fallback=False)
+        model_alias = get_model(user_id)
+        reply = await chat(messages, model_alias=model_alias, fallback=False)
 
     await save_message(user_id, "user", user_message)
     await save_message(user_id, "assistant", reply)

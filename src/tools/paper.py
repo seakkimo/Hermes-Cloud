@@ -1,5 +1,5 @@
 import arxiv
-from src.llm.openrouter import chat
+from src.llm.llm import chat
 
 TOPICS = {
     "AI": "artificial intelligence machine learning",

@@ -1,0 +1,95 @@
+import logging
+from openai import AsyncOpenAI, RateLimitError, NotFoundError
+from config.settings import OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+
+logger = logging.getLogger(__name__)
+
+# Cache: loaded once per process, refreshed on demand
+_models_cache: list[dict] = []
+
+
+async def _load_models() -> list[dict]:
+    global _models_cache
+    if _models_cache:
+        return _models_cache
+    try:
+        from src.memory.supabase import get_supabase_client
+        client = get_supabase_client()
+        result = (
+            client.table("models")
+            .select("*")
+            .eq("is_active", True)
+            .order("priority")
+            .execute()
+        )
+        _models_cache = result.data or []
+        logger.info(f"Loaded {len(_models_cache)} models from Supabase")
+    except Exception as e:
+        logger.error(f"Failed to load models from Supabase: {e}")
+        _models_cache = []
+    return _models_cache
+
+
+def invalidate_cache():
+    global _models_cache
+    _models_cache = []
+
+
+def _make_client(model_row: dict) -> AsyncOpenAI:
+    api_key = model_row.get("api_key") or OPENROUTER_API_KEY
+    base_url = model_row.get("base_url") or OPENROUTER_BASE_URL
+    return AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+
+async def get_model_by_alias(alias: str) -> dict | None:
+    models = await _load_models()
+    for m in models:
+        if m["alias"] == alias:
+            return m
+    return None
+
+
+async def list_models() -> list[dict]:
+    return await _load_models()
+
+
+async def chat(messages: list[dict], model_alias: str = "", fallback: bool = True) -> str:
+    models = await _load_models()
+
+    if not models:
+        # Hard fallback to env-based OpenRouter if DB is empty
+        client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
+        from config.settings import OPENROUTER_DEFAULT_MODEL
+        response = await client.chat.completions.create(
+            model=OPENROUTER_DEFAULT_MODEL, messages=messages
+        )
+        return response.choices[0].message.content
+
+    if model_alias:
+        # Find specific model
+        target = next((m for m in models if m["alias"] == model_alias), None)
+        if not target:
+            raise ValueError(f"Model alias '{model_alias}' not found")
+        candidates = [target] if not fallback else [target] + [m for m in models if m["alias"] != model_alias]
+    else:
+        candidates = models  # full fallback chain by priority
+
+    for model_row in candidates:
+        try:
+            client = _make_client(model_row)
+            logger.info(f"Calling [{model_row['provider']}] {model_row['model_id']}")
+            response = await client.chat.completions.create(
+                model=model_row["model_id"],
+                messages=messages,
+            )
+            return response.choices[0].message.content
+        except (RateLimitError, NotFoundError) as e:
+            if not fallback:
+                raise
+            logger.warning(f"Model {model_row['model_id']} unavailable ({e.status_code}), trying next...")
+        except Exception as e:
+            if not fallback:
+                raise
+            logger.warning(f"Model {model_row['model_id']} error ({e}), trying next...")
+
+    raise RuntimeError("All models in fallback chain are unavailable.")
