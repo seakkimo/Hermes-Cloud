@@ -853,4 +853,111 @@ curl -X POST https://your-app.onrender.com/mcp \
 | V0.7 | Browser Agent — Tavily + Jina Reader | ✅ 完成 |
 | V0.8 | MCP Server — Cline 整合 | ✅ 完成 |
 | V0.9 | Robot Tool — ROS2 Bridge Agent | ✅ 完成 |
-| V1.0 | Personal AI Operating System | ⏳ 規劃中 |
+| V1.0 | Dynamic Model Registry + Multi-Provider | ✅ 完成 |
+
+---
+
+## V1.0 — Dynamic Model Registry + Multi-Provider
+
+### 架構
+
+```
+Supabase models 表
+  ├── alias       (短名稱，如 gemma / claude / gpt4o)
+  ├── model_id    (完整 model string)
+  ├── provider    (openrouter / openai / anthropic / google)
+  ├── base_url    (各家 API endpoint)
+  ├── api_key     (各家 key，空白則用 OPENROUTER_API_KEY)
+  ├── priority    (fallback 順序，數字越小越優先)
+  └── is_active   (啟用/停用，不刪除直接切換)
+```
+
+### Supabase SQL
+
+```sql
+CREATE TABLE models (
+  id          BIGSERIAL PRIMARY KEY,
+  alias       TEXT UNIQUE NOT NULL,
+  model_id    TEXT NOT NULL,
+  provider    TEXT NOT NULL DEFAULT 'openrouter',
+  base_url    TEXT NOT NULL DEFAULT 'https://openrouter.ai/api/v1',
+  api_key     TEXT NOT NULL DEFAULT '',
+  priority    INT NOT NULL DEFAULT 99,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO models (alias, model_id, provider, priority) VALUES
+  ('gemma',    'google/gemma-4-31b-it:free',                 'openrouter', 1),
+  ('gemma3',   'google/gemma-3-27b-it:free',                 'openrouter', 2),
+  ('llama',    'meta-llama/llama-4-scout:free',              'openrouter', 3),
+  ('qwen',     'qwen/qwen3-coder:free',                      'openrouter', 4),
+  ('mistral',  'mistralai/mistral-7b-instruct:free',         'openrouter', 5),
+  ('nemotron', 'nvidia/nemotron-3-ultra-550b-a55b:free',     'openrouter', 6),
+  ('gpt120',   'openai/gpt-oss-120b:free',                   'openrouter', 7),
+  ('hermes',   'nousresearch/hermes-3-llama-3.1-405b:free',  'openrouter', 8),
+  ('deepseek', 'deepseek/deepseek-r1',                       'openrouter', 20);
+```
+
+### 新增核心檔案
+
+**`src/llm/llm.py`** — 通用 LLM client，從 Supabase 動態載入模型，支援任意 provider
+
+- 啟動時從 DB 載入模型清單並 cache
+- 每次 `/model add/remove/on/off` 後呼叫 `invalidate_cache()` 清除 cache
+- `chat()` 依 priority 順序嘗試 fallback
+
+**`src/memory/supabase.py`** — 新增 model registry CRUD：
+- `db_list_models()` — 列出所有模型
+- `db_add_model()` — 新增或更新模型（upsert by alias）
+- `db_remove_model()` — 刪除模型
+- `db_toggle_model()` — 啟用/停用模型
+
+### Telegram 新增指令
+
+| 指令 | 說明 |
+|------|------|
+| `/status` | 顯示系統狀態（模型、搜尋引擎、機器人連線、DB 模型數） |
+| `/model list` | 從 DB 動態載入模型清單 |
+| `/model add <alias> <model_id> <provider> [priority] [base_url] [api_key]` | 新增模型 |
+| `/model remove <alias>` | 刪除模型 |
+| `/model on <alias>` | 啟用模型 |
+| `/model off <alias>` | 停用模型 |
+
+### 新增不同 Provider 範例
+
+```
+# OpenAI 直連
+/model add gpt4o gpt-4o openai 10 https://api.openai.com/v1 sk-你的key
+
+# Anthropic Claude
+/model add claude claude-3-5-sonnet-20241022 anthropic 10 https://api.anthropic.com/v1 sk-ant-你的key
+
+# Google Gemini (via OpenRouter)
+/model add gemini google/gemini-2.0-flash:free openrouter 3
+
+# 任何 OpenRouter 新模型
+/model add newmodel provider/model-name:free openrouter 5
+```
+
+### 驗證
+
+```
+/status
+→ 📊 Hermes System Status
+→ 🤖 Model: auto (fallback)
+→ 🔍 Search: tavily
+→ 📦 Active models in DB: 9  ✅
+
+/model list
+→ 顯示 9 個模型，從 Supabase 動態載入  ✅
+
+/model add testmodel meta-llama/llama-4-scout:free openrouter 1
+→ ✅ Model testmodel added/updated
+
+/model off testmodel
+→ ⏸ Model testmodel disabled
+
+/model remove testmodel
+→ 🗑 Model testmodel removed  ✅
+```
