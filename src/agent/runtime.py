@@ -43,6 +43,19 @@ def _truncate(text: str) -> str:
     return text[:MAX_REPLY_CHARS] + "\n\n…（訊息過長，已截斷）"
 
 
+SEARCH_KEYWORDS = [
+    "今天", "今日", "最新", "最近", "現在", "目前",
+    "新討", "消息", "動態", "資訊",
+    "搜尋", "查一下", "幫我找", "幫我查", "查詢",
+    "latest", "recent", "today", "news", "search", "find",
+]
+
+
+def _needs_search(user_message: str) -> bool:
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
+
+
 async def run(
     user_message: str,
     user_id: int = 0,
@@ -81,15 +94,33 @@ async def run(
     model_alias = "" if is_auto(user_id) else get_model(user_id)
     fallback = is_auto(user_id)
 
-    # Check if active model supports tool calling
+    # In auto mode, check if ALL available models don't support tool calling
+    # If so, fall back to keyword-based routing
+    from src.llm.llm import get_model_by_alias
     use_tools = True
     if not fallback and model_alias:
-        from src.llm.llm import get_model_by_alias
         m = await get_model_by_alias(model_alias)
         if m and m["model_id"] in NO_TOOL_CALL_MODELS:
             use_tools = False
+    elif fallback:
+        # Check if any active model supports tool calling
+        from src.llm.llm import list_models
+        active = await list_models()
+        supporting = [m for m in active if m["model_id"] not in NO_TOOL_CALL_MODELS]
+        if not supporting:
+            use_tools = False
+            logger.info("No tool-calling models available, using keyword routing")
 
     if not use_tools:
+        # Keyword-based routing when no tool-calling model available
+        needs_web = _needs_search(user_message)
+        if needs_web:
+            engine = get_search_engine(user_id)
+            logger.info(f"Keyword routing [{engine}]: {user_message}")
+            search_context = await _run_search(user_message, engine)
+            messages[-1]["content"] = (
+                f"以下是網路搜尋結果，請根據這些資料回答問題：\n\n{search_context}\n\n問題：{user_message}"
+            )
         reply = await _llm(messages, user_id)
         await _save(user_id, user_message, reply)
         return _truncate(reply)
@@ -115,6 +146,12 @@ async def run(
         content = response.get("content") or ""
 
         # No tool call → final answer
+        if not tool_calls:
+            reply = content
+            break
+
+        # Sanity check: ignore tool calls with empty/invalid function names
+        tool_calls = [tc for tc in tool_calls if tc.get("function", {}).get("name")]
         if not tool_calls:
             reply = content
             break
