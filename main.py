@@ -164,6 +164,12 @@ def run_webhook():
             except Exception as e:
                 logger.error(f"Paper task error: {e}")
 
+        elif task_name == "robot_command":
+            params = data.get("params", {})
+            command = params.get("command", {})
+            result = await send_robot_command(command)
+            return {"status": "ok", "task": task_name, "result": result}
+
         return {"status": "ok", "task": task_name}
 
     @web.post("/webhook")
