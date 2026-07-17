@@ -37,7 +37,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     model = get_model(user_id)
     engine = get_search_engine(user_id)
-    models = await list_models()
+    models = await list_models(all_models=True)
 
     # Check robot bridge
     try:
@@ -49,13 +49,13 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception:
         robot = "❓ unknown"
 
-    model_display = "auto (fallback)" if model == AUTO_MODEL else model
+    active = len([m for m in models if m['is_active']])
     lines = [
         "📊 *Hermes System Status*\n",
         f"🤖 Model: `{model_display}`",
         f"🔍 Search: `{engine}`",
         f"🦾 Robot: {robot}",
-        f"📦 Active models in DB: `{len([m for m in models if m['is_active']])}`",
+        f"📦 Models in DB: `{active}` active / `{len(models)}` total",
     ]
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
@@ -66,13 +66,13 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # /model list
     if not args or args[0] == "list":
-        models = await list_models()
+        models = await list_models(all_models=True)
         current = get_model(user_id)
         display = "auto" if current == AUTO_MODEL else current
         lines = [f"Current: `{display}`\n", "Available models:"]
         for m in models:
             status = "✅" if m["is_active"] else "⏸"
-            lines.append(f"  {status} `{m['alias']}` → `{m['model_id']}` [{m['provider']}] (priority:{m['priority']})")
+            lines.append(f"  {status} `{m['alias']}` → `{m['model_id']}` [{m['provider']}] (priority:{m['priority']})") 
         lines.append("\n`/model auto` to reset to fallback mode")
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
         return

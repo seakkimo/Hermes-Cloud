@@ -49,7 +49,21 @@ async def get_model_by_alias(alias: str) -> dict | None:
     return None
 
 
-async def list_models() -> list[dict]:
+async def list_models(all_models: bool = False) -> list[dict]:
+    if all_models:
+        try:
+            from src.memory.supabase import get_supabase_client
+            client = get_supabase_client()
+            result = (
+                client.table("models")
+                .select("*")
+                .order("priority")
+                .execute()
+            )
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to load all models: {e}")
+            return []
     return await _load_models()
 
 

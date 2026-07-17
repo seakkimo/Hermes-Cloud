@@ -857,6 +857,122 @@ curl -X POST https://your-app.onrender.com/mcp \
 
 ---
 
+## 💬 Telegram 可用指令完整說明
+
+### /start
+
+顯示所有可用指令與格式說明。
+
+---
+
+### /status
+
+顯示系統目前狀態。
+
+```
+/status
+```
+
+輸出內容：
+- 🤖 目前使用的模型（auto 或指定 alias）
+- 🔍 目前搜尋引擎
+- 🦾 Robot Bridge 連線狀態
+- 📦 DB 中模型數量（active / total）
+
+---
+
+### /model
+
+動態模型管理。
+
+| 指令 | 說明 |
+|------|---------|
+| `/model list` | 列出 DB 中所有模型（含停用） |
+| `/model auto` | 回到自動 fallback 模式 |
+| `/model <alias>` | 切換到指定模型（失敗不 fallback） |
+| `/model add ...` | 新增或更新模型 |
+| `/model remove <alias>` | 刪除模型 |
+| `/model on <alias>` | 啟用模型 |
+| `/model off <alias>` | 停用模型（保留記錄） |
+
+#### /model add 完整格式
+
+```
+/model add <alias> <model_id> <provider> [priority] [base_url] [api_key]
+```
+
+| 參數 | 必填 | 說明 |
+|------|------|---------|
+| `alias` | ✅ | 短名稱，自定義，如 `claude` |
+| `model_id` | ✅ | 完整 model string，如 `claude-3-5-sonnet-20241022` |
+| `provider` | ✅ | `openrouter` / `openai` / `anthropic` / `google` |
+| `priority` | ✖️ | 數字越小越優先，預設 50 |
+| `base_url` | ✖️ | API endpoint，預設 OpenRouter |
+| `api_key` | ✖️ | 各家 key，空白則用 `OPENROUTER_API_KEY` |
+
+範例：
+
+```
+# OpenRouter 免費模型（最簡）
+/model add gemini google/gemini-2.0-flash:free openrouter 3
+
+# OpenAI 直連
+/model add gpt4o gpt-4o openai 10 https://api.openai.com/v1 sk-你的key
+
+# Anthropic Claude
+/model add claude claude-3-5-sonnet-20241022 anthropic 10 https://api.anthropic.com/v1 sk-ant-你的key
+
+# 停用不常用的模型
+/model off deepseek
+
+# 重新啟用
+/model on deepseek
+```
+
+---
+
+### /search
+
+管理搜尋引擎。
+
+| 指令 | 說明 |
+|------|---------|
+| `/search list` | 列出可用搜尋引擎 |
+| `/search tavily` | 切換到 Tavily（1000 req/月免費） |
+| `/search news` | 切換到 Google News RSS（無限制，僅新討） |
+
+---
+
+### /browse
+
+搜尋網路或擷取網頁。
+
+```
+/browse <url>          → 擷取網頁內容並摘要
+/browse <keywords>     → 強制搜尋（不管是否含關鍵字）
+```
+
+範例：
+```
+/browse https://openai.com
+/browse latest robotics news
+/browse 2025 年 AI 發展趨勢
+```
+
+> 一般訊息如果包含關鍵字（今天、最新、news 等）會自動觸發搜尋，不需要指令。
+
+---
+
+### /clear
+
+清除該使用者的全部對話記憶。
+
+```
+/clear
+```
+
+---
+
 ## V1.0 — Dynamic Model Registry + Multi-Provider
 
 ### 架構
