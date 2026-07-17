@@ -711,42 +711,82 @@ curl https://hermes-cloud-y1i2.onrender.com/ws/robot/status
 # 預期：{"connected": true}
 ```
 
-### 驗證 Bridge Agent（待測試）
+### 驗證 Bridge Agent ✅
+
+> ⚠️ Render Free tier 每次重新部署後 WebSocket 連線會斷開，需重新啟動 Bridge Agent
 
 #### 步驟 1：確認 WebSocket 連線狀態
 
 ```bash
-curl https://your-app.onrender.com/ws/robot/status
+curl https://hermes-cloud-y1i2.onrender.com/ws/robot/status
 # 預期：{"connected": true}
 ```
 
-#### 步驟 2：透過 /task endpoint 傳送機器人指令
+#### 步驟 2：WSL2 開新 terminal 監聽 /cmd_vel
 
 ```bash
+source /opt/ros/jazzy/setup.bash
+ros2 topic echo /cmd_vel
+```
+
+#### 步驟 3：傳送機器人指令
+
+```bash
+# move_forward
 curl -X POST https://hermes-cloud-y1i2.onrender.com/task \
   -H "Content-Type: application/json" \
   -H "x-scheduler-secret: YOUR_SCHEDULER_SECRET" \
   -d '{"task": "robot_command", "params": {"command": {"action": "move_forward", "speed": 0.3}}}'
-# 預期：{"status": "ok", "task": "robot_command", "result": "Command sent: ..."}
+# 預期：{"status": "ok", "task": "robot_command", "result": "Command sent: {'action': 'move_forward', 'speed': 0.3}"}
+
+# turn_left
+curl -X POST https://hermes-cloud-y1i2.onrender.com/task \
+  -H "Content-Type: application/json" \
+  -H "x-scheduler-secret: YOUR_SCHEDULER_SECRET" \
+  -d '{"task": "robot_command", "params": {"command": {"action": "turn_left", "speed": 0.5}}}'
+
+# stop
+curl -X POST https://hermes-cloud-y1i2.onrender.com/task \
+  -H "Content-Type: application/json" \
+  -H "x-scheduler-secret: YOUR_SCHEDULER_SECRET" \
+  -d '{"task": "robot_command", "params": {"command": {"action": "stop"}}}'
 ```
 
-#### 步驟 3：確認 ROS2 Topic 收到訊息
+#### 步驟 4：確認 /cmd_vel 輸出（實測結果）
 
-```bash
-# WSL2 另一個 terminal
-source /opt/ros/jazzy/setup.bash
-ros2 topic echo /cmd_vel
-# 預期：
-# linear:
-#   x: 0.3
-# angular:
-#   z: 0.0
+```
+linear:
+  x: 0.3   ← move_forward
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+---
+linear:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.5   ← turn_left
+---
+linear:
+  x: 0.0   ← stop
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+---
 ```
 
-#### 步驟 4：Gazebo 視覺化測試
+#### 步驟 5：Gazebo 視覺化測試（選用）
 
 ```bash
-# 啟動 TurtleBot3 模擬（需安裝 turtlebot3 packages）
 export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 ```
@@ -812,5 +852,5 @@ curl -X POST https://your-app.onrender.com/mcp \
 | V0.6 | Paper Agent — 每日 arXiv 論文摘要 | ✅ 完成 |
 | V0.7 | Browser Agent — Tavily + Jina Reader | ✅ 完成 |
 | V0.8 | MCP Server — Cline 整合 | ✅ 完成 |
-| V0.9 | Robot Tool — ROS2 Bridge Agent | 🔄 連線成功，待功能測試 |
+| V0.9 | Robot Tool — ROS2 Bridge Agent | ✅ 完成 |
 | V1.0 | Personal AI Operating System | ⏳ 規劃中 |
