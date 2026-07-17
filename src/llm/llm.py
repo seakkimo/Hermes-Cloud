@@ -38,7 +38,7 @@ def invalidate_cache():
 def _make_client(model_row: dict) -> AsyncOpenAI:
     api_key = model_row.get("api_key") or OPENROUTER_API_KEY
     base_url = model_row.get("base_url") or OPENROUTER_BASE_URL
-    return AsyncOpenAI(api_key=api_key, base_url=base_url)
+    return AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
 
 
 async def get_model_by_alias(alias: str) -> dict | None:
@@ -71,8 +71,7 @@ async def chat(messages: list[dict], model_alias: str = "", fallback: bool = Tru
     models = await _load_models()
 
     if not models:
-        # Hard fallback to env-based OpenRouter if DB is empty
-        client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
+        client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL, max_retries=0)
         from config.settings import OPENROUTER_DEFAULT_MODEL
         response = await client.chat.completions.create(
             model=OPENROUTER_DEFAULT_MODEL, messages=messages
@@ -119,7 +118,7 @@ async def chat_with_tools(
     models = await _load_models()
 
     if not models:
-        client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
+        client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL, max_retries=0)
         from config.settings import OPENROUTER_DEFAULT_MODEL
         response = await client.chat.completions.create(
             model=OPENROUTER_DEFAULT_MODEL, messages=messages, tools=tools, tool_choice="auto"
