@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Any
 
 
@@ -7,7 +7,8 @@ class Tool:
     name: str
     description: str
     func: Callable
-    parameters: dict  # JSON Schema
+    parameters: dict  # JSON Schema properties
+    required: list[str] = field(default_factory=list)  # required param names
 
 
 # Tool registry
@@ -23,6 +24,7 @@ def get_tool(name: str) -> Tool | None:
 
 
 def list_tools() -> list[dict]:
+    """MCP format (inputSchema)."""
     return [
         {
             "name": t.name,
@@ -30,7 +32,26 @@ def list_tools() -> list[dict]:
             "inputSchema": {
                 "type": "object",
                 "properties": t.parameters,
-                "required": list(t.parameters.keys()),
+                "required": t.required or list(t.parameters.keys()),
+            },
+        }
+        for t in _registry.values()
+    ]
+
+
+def to_openai_schema() -> list[dict]:
+    """OpenAI function calling format."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t.name,
+                "description": t.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": t.parameters,
+                    "required": t.required or list(t.parameters.keys()),
+                },
             },
         }
         for t in _registry.values()
