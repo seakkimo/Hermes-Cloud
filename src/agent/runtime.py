@@ -1,20 +1,46 @@
 import json
 import logging
-from src.llm.llm import chat, chat_with_tools, chat_with_tools
+from datetime import datetime, timezone, timedelta
+from src.llm.llm import chat, chat_with_tools
 from src.agent.session import get_model, is_auto, get_search_engine
 from src.memory.supabase import load_history, save_message
 from src.tools.browser import fetch_page
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are Hermes, a personal AI assistant. "
-    "Be concise, helpful, and honest. "
-    "Use tools when you need current information, need to browse the web, or control the robot. "
-    "Respond in the same language as the user."
-)
+TZ_TAIPEI = timezone(timedelta(hours=8))
+MAX_TOOL_ROUNDS = 3
+MAX_REPLY_CHARS = 3800  # Telegram limit is 4096, leave buffer
 
-MAX_TOOL_ROUNDS = 5  # prevent infinite loops
+# Models that do NOT support function calling — skip tool loop for these
+NO_TOOL_CALL_MODELS = {
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nemotron-3.5-content-safety:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "mistralai/mistral-7b-instruct:free",
+}
+
+
+def _system_prompt() -> str:
+    now = datetime.now(TZ_TAIPEI).strftime("%Y-%m-%d %H:%M %Z")
+    return (
+        f"You are Hermes, a personal AI assistant. "
+        f"Current date and time: {now}. "
+        f"Be concise, helpful, and honest. "
+        f"Use tools when you need current information, need to browse the web, or control the robot. "
+        f"Respond in the same language as the user."
+    )
+
+
+def _truncate(text: str) -> str:
+    if len(text) <= MAX_REPLY_CHARS:
+        return text
+    return text[:MAX_REPLY_CHARS] + "\n\n…（訊息過長，已截斷）"
 
 
 async def run(
@@ -24,7 +50,7 @@ async def run(
     force_search: bool = False,
 ) -> str:
     history = await load_history(user_id)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": _system_prompt()}]
     messages += history
 
     # ── Force modes (bypass LLM tool decision) ────────────────────────────────
@@ -36,7 +62,7 @@ async def run(
         })
         reply = await _llm(messages, user_id)
         await _save(user_id, user_message, reply)
-        return reply
+        return _truncate(reply)
 
     if force_search:
         engine = get_search_engine(user_id)
@@ -47,38 +73,60 @@ async def run(
         })
         reply = await _llm(messages, user_id)
         await _save(user_id, user_message, reply)
-        return reply
+        return _truncate(reply)
 
     # ── Agent Loop (Function Calling) ─────────────────────────────────────────
     messages.append({"role": "user", "content": user_message})
 
+    model_alias = "" if is_auto(user_id) else get_model(user_id)
+    fallback = is_auto(user_id)
+
+    # Check if active model supports tool calling
+    use_tools = True
+    if not fallback and model_alias:
+        from src.llm.llm import get_model_by_alias
+        m = await get_model_by_alias(model_alias)
+        if m and m["model_id"] in NO_TOOL_CALL_MODELS:
+            use_tools = False
+
+    if not use_tools:
+        reply = await _llm(messages, user_id)
+        await _save(user_id, user_message, reply)
+        return _truncate(reply)
+
     from src.mcp.registry import to_openai_schema, call_tool
     tools = to_openai_schema()
 
+    reply = ""
     for round_num in range(MAX_TOOL_ROUNDS):
-        model_alias = "" if is_auto(user_id) else get_model(user_id)
-        fallback = is_auto(user_id)
+        try:
+            response = await chat_with_tools(
+                messages=messages,
+                tools=tools,
+                model_alias=model_alias,
+                fallback=fallback,
+            )
+        except Exception as e:
+            logger.error(f"chat_with_tools error: {e}")
+            reply = await _llm(messages, user_id)
+            break
 
-        response = await chat_with_tools(
-            messages=messages,
-            tools=tools,
-            model_alias=model_alias,
-            fallback=fallback,
-        )
+        tool_calls = response.get("tool_calls")
+        content = response.get("content") or ""
 
         # No tool call → final answer
-        if not response.get("tool_calls"):
-            reply = response["content"] or ""
+        if not tool_calls:
+            reply = content
             break
 
         # Execute all tool calls in this round
         messages.append({
             "role": "assistant",
-            "content": response.get("content"),
-            "tool_calls": response["tool_calls"],
+            "content": content or None,
+            "tool_calls": tool_calls,
         })
 
-        for tc in response["tool_calls"]:
+        for tc in tool_calls:
             tool_name = tc["function"]["name"]
             try:
                 arguments = json.loads(tc["function"]["arguments"])
@@ -97,11 +145,14 @@ async def run(
                 "content": str(result),
             })
     else:
-        # Exceeded max rounds — ask LLM to summarise what it has
+        # Exceeded max rounds — summarise
+        reply = await _llm(messages, user_id)
+
+    if not reply:
         reply = await _llm(messages, user_id)
 
     await _save(user_id, user_message, reply)
-    return reply
+    return _truncate(reply)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
