@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "👋 *Hermes V1.0 online.*\n\n"
+        "👋 *Hermes V1.1 online.*\n\n"
         "*模型管理*\n"
         "`/model list` — 列出所有模型\n"
         "`/model <alias>` — 切換模型\n"
@@ -26,6 +26,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/search list` — 列出搜尋引擎\n"
         "`/search <engine>` — 切換搜尋引擎\n"
         "`/browse <url|keywords>` — 搜尋或擷取網頁\n\n"
+        "*行事曆*\n"
+        "`/calendar list [days]` — 列出近期事件\n"
+        "`/calendar add <title> <YYYY-MM-DD HH:MM>` — 新增事件\n"
+        "`/calendar del <title>` — 刪除事件\n\n"
+        "*Email*\n"
+        "`/email inbox [count]` — 讀取收件匣\n"
+        "`/email send <to> <subject> | <body>` — 發送郵件\n\n"
+        "*程式執行*\n"
+        "`/run <python code>` — 執行 Python 程式碼\n\n"
         "*其他*\n"
         "`/status` — 系統狀態\n"
         "`/clear` — 清除對話記憶",
@@ -216,6 +225,97 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text("🧹 Conversation history cleared.")
 
 
+async def calendar_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Usage:\n`/calendar list [days]`\n`/calendar add <title> <YYYY-MM-DD HH:MM>`\n`/calendar del <title>`",
+            parse_mode="Markdown"
+        )
+        return
+
+    sub = args[0].lower()
+    from src.tools.calendar import list_events, add_event, delete_event
+
+    if sub == "list":
+        days = int(args[1]) if len(args) > 1 and args[1].isdigit() else 7
+        result = await list_events(days=days, user_id=user_id)
+        await update.message.reply_text(result)
+
+    elif sub == "add":
+        if len(args) < 3:
+            await update.message.reply_text("Usage: `/calendar add <title> <YYYY-MM-DD HH:MM>`", parse_mode="Markdown")
+            return
+        # Last arg that looks like a date is the start time; everything before is title
+        start = args[-1] if len(args[-1]) >= 10 else None
+        if not start:
+            await update.message.reply_text("❌ Please provide a date: YYYY-MM-DD or YYYY-MM-DD HH:MM")
+            return
+        title = " ".join(args[1:-1])
+        result = await add_event(title=title, start=start, user_id=user_id)
+        await update.message.reply_text(result)
+
+    elif sub == "del":
+        if len(args) < 2:
+            await update.message.reply_text("Usage: `/calendar del <title>`", parse_mode="Markdown")
+            return
+        title = " ".join(args[1:])
+        result = await delete_event(title=title, user_id=user_id)
+        await update.message.reply_text(result)
+
+    else:
+        await update.message.reply_text("Unknown subcommand. Use `list`, `add`, or `del`.", parse_mode="Markdown")
+
+
+async def email_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Usage:\n`/email inbox [count]`\n`/email send <to> <subject> | <body>`",
+            parse_mode="Markdown"
+        )
+        return
+
+    sub = args[0].lower()
+    from src.tools.email_tool import read_emails, send_email
+
+    if sub == "inbox":
+        count = int(args[1]) if len(args) > 1 and args[1].isdigit() else 5
+        await update.message.chat.send_action("typing")
+        result = await read_emails(count=count)
+        await update.message.reply_text(result)
+
+    elif sub == "send":
+        # /email send <to> <subject> | <body>
+        rest = " ".join(args[1:])
+        if "|" not in rest:
+            await update.message.reply_text("Usage: `/email send <to> <subject> | <body>`", parse_mode="Markdown")
+            return
+        header, body = rest.split("|", 1)
+        parts = header.strip().split(" ", 1)
+        if len(parts) < 2:
+            await update.message.reply_text("Usage: `/email send <to> <subject> | <body>`", parse_mode="Markdown")
+            return
+        to, subject = parts[0], parts[1].strip()
+        result = await send_email(to=to, subject=subject, body=body.strip())
+        await update.message.reply_text(result)
+
+    else:
+        await update.message.reply_text("Unknown subcommand. Use `inbox` or `send`.", parse_mode="Markdown")
+
+
+async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text("Usage: `/run <python code>`", parse_mode="Markdown")
+        return
+    code = " ".join(context.args)
+    await update.message.chat.send_action("typing")
+    from src.tools.code_exec import execute_python
+    result = await execute_python(code)
+    await update.message.reply_text(result, parse_mode="Markdown")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     user_text = update.message.text
@@ -237,5 +337,8 @@ def build_app():
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler("clear", clear_command))
     app.add_handler(CommandHandler("browse", browse_command))
+    app.add_handler(CommandHandler("calendar", calendar_command))
+    app.add_handler(CommandHandler("email", email_command))
+    app.add_handler(CommandHandler("run", run_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return app

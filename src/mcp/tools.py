@@ -2,6 +2,9 @@ from src.mcp.registry import Tool, register
 from src.tools.browser import search, fetch_page
 from src.tools.news import run as news_run
 from src.tools.paper import run as paper_run
+from src.tools.calendar import add_event, list_events, delete_event
+from src.tools.email_tool import send_email, read_emails
+from src.tools.code_exec import execute_python
 from src.memory.supabase import load_history
 
 
@@ -101,4 +104,75 @@ def setup():
             "speed": {"type": "number", "description": "Speed value 0.1-1.0, default 0.3"},
         },
         required=["action"],
+    ))
+
+    # ── V1.1 Tools ────────────────────────────────────────────────────────────
+
+    register(Tool(
+        name="calendar_add",
+        description="Add a calendar event. Use for scheduling, reminders, or appointments.",
+        func=add_event,
+        parameters={
+            "title": {"type": "string", "description": "Event title"},
+            "start": {"type": "string", "description": "Start time, format: YYYY-MM-DD HH:MM or YYYY-MM-DD"},
+            "end": {"type": "string", "description": "End time (optional), same format as start"},
+            "description": {"type": "string", "description": "Optional event description"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["title", "start", "user_id"],
+    ))
+
+    register(Tool(
+        name="calendar_list",
+        description="List upcoming calendar events within the next N days.",
+        func=list_events,
+        parameters={
+            "days": {"type": "integer", "description": "Number of days to look ahead, default 7"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["user_id"],
+    ))
+
+    register(Tool(
+        name="calendar_delete",
+        description="Delete a calendar event by title.",
+        func=delete_event,
+        parameters={
+            "title": {"type": "string", "description": "Event title to delete (partial match)"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["title", "user_id"],
+    ))
+
+    register(Tool(
+        name="email_send",
+        description="Send an email to a recipient.",
+        func=send_email,
+        parameters={
+            "to": {"type": "string", "description": "Recipient email address"},
+            "subject": {"type": "string", "description": "Email subject"},
+            "body": {"type": "string", "description": "Email body content"},
+        },
+        required=["to", "subject", "body"],
+    ))
+
+    register(Tool(
+        name="email_read",
+        description="Read the latest emails from inbox.",
+        func=read_emails,
+        parameters={
+            "count": {"type": "integer", "description": "Number of emails to read, default 5"},
+            "folder": {"type": "string", "description": "Mailbox folder, default INBOX"},
+        },
+        required=[],
+    ))
+
+    register(Tool(
+        name="execute_python",
+        description="Execute Python code and return the output. Use for calculations, data processing, or any computation.",
+        func=execute_python,
+        parameters={
+            "code": {"type": "string", "description": "Python code to execute"},
+        },
+        required=["code"],
     ))

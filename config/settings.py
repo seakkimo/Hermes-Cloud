@@ -79,7 +79,13 @@ SCHEDULER_SECRET: str = os.getenv("SCHEDULER_SECRET", "")
 TELEGRAM_OWNER_CHAT_ID: int = int(os.getenv("TELEGRAM_OWNER_CHAT_ID", "0"))
 
 # Render
-
-# Render
 RENDER_EXTERNAL_URL: str = os.getenv("RENDER_EXTERNAL_URL", "")
 PORT: int = int(os.getenv("PORT", "8000"))
+
+# Email (SMTP/IMAP)
+EMAIL_ADDRESS: str = os.getenv("EMAIL_ADDRESS", "")
+EMAIL_PASSWORD: str = os.getenv("EMAIL_PASSWORD", "")
+SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
+IMAP_HOST: str = os.getenv("IMAP_HOST", "imap.gmail.com")
+IMAP_PORT: int = int(os.getenv("IMAP_PORT", "993"))

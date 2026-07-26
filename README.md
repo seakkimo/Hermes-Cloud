@@ -40,6 +40,7 @@ Agent Runtime
 | V0.8 | MCP Server | ✅ |
 | V0.9 | Robot Tool (ROS2 Bridge) | ✅ |
 | V1.0 | Dynamic Model Registry + Multi-Provider | ✅ |
+| V1.1 | Calendar + Email + Code Execution Tools | ✅ |
 
 ## Telegram Commands
 
@@ -58,6 +59,12 @@ Agent Runtime
 | `/search <engine>` | Switch search engine (tavily / news) |
 | `/browse <url>` | Fetch and summarize a webpage |
 | `/browse <keywords>` | Force web search |
+| `/calendar list [days]` | List upcoming events |
+| `/calendar add <title> <date>` | Add calendar event |
+| `/calendar del <title>` | Delete calendar event |
+| `/email inbox [count]` | Read inbox emails |
+| `/email send <to> <subject> \| <body>` | Send email |
+| `/run <python code>` | Execute Python code |
 | `/clear` | Clear conversation memory |
 
 ## Local Setup
@@ -78,7 +85,7 @@ src/
   llm/         # Universal LLM client (multi-provider)
   agent/       # Agent Runtime + Session
   memory/      # Supabase (conversations + model registry)
-  tools/       # Browser / News / Paper
+  tools/       # Browser / News / Paper / Calendar / Email / Code Exec
   mcp/         # MCP Server (FastAPI)
 bridge/        # ROS2 Bridge Agent (WSL2 local)
 config/        # Settings
