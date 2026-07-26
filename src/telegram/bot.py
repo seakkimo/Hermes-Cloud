@@ -50,6 +50,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         robot = "❓ unknown"
 
     active = len([m for m in models if m['is_active']])
+    model_display = "auto" if model == AUTO_MODEL else model
     lines = [
         "📊 *Hermes System Status*\n",
         f"🤖 Model: `{model_display}`",
@@ -69,10 +70,17 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         models = await list_models(all_models=True)
         current = get_model(user_id)
         display = "auto" if current == AUTO_MODEL else current
-        lines = [f"Current: `{display}`\n", "Available models:"]
+        lines = [f"Current: `{display}`\n"]
+        # group by provider
+        from collections import defaultdict
+        by_provider = defaultdict(list)
         for m in models:
-            status = "✅" if m["is_active"] else "⏸"
-            lines.append(f"  {status} `{m['alias']}` → `{m['model_id']}` [{m['provider']}] (priority:{m['priority']})") 
+            by_provider[m["provider"]].append(m)
+        for provider, pmodels in sorted(by_provider.items()):
+            lines.append(f"*[{provider}]*")
+            for m in pmodels:
+                status = "✅" if m["is_active"] else "⏸"
+                lines.append(f"  {status} `{m['alias']}` → `{m['model_id']}` (p:{m['priority']})")
         lines.append("\n`/model auto` to reset to fallback mode")
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
         return
