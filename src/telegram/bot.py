@@ -76,22 +76,32 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # /model list
     if not args or args[0] == "list":
-        models = await list_models(all_models=True)
+        models = await db_list_models()
         current = get_model(user_id)
         display = "auto" if current == AUTO_MODEL else current
-        lines = [f"Current: `{display}`\n"]
-        # group by provider
         from collections import defaultdict
         by_provider = defaultdict(list)
         for m in models:
             by_provider[m["provider"]].append(m)
+        # Build chunks to avoid Telegram 4096 char limit
+        chunks = [f"Current: `{display}`"]
         for provider, pmodels in sorted(by_provider.items()):
-            lines.append(f"*[{provider}]*")
+            block = [f"\n*[{provider}]*"]
             for m in pmodels:
                 status = "✅" if m["is_active"] else "⏸"
-                lines.append(f"  {status} `{m['alias']}` → `{m['model_id']}` (p:{m['priority']})")
-        lines.append("\n`/model auto` to reset to fallback mode")
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+                block.append(f"  {status} `{m['alias']}` → `{m['model_id']}` (p:{m['priority']})")
+            chunks.append("\n".join(block))
+        chunks.append("\n`/model auto` to reset")
+        # Send in one message; split if over 4000 chars
+        full = "\n".join(chunks)
+        if len(full) <= 4000:
+            await update.message.reply_text(full, parse_mode="Markdown")
+        else:
+            # Send header + each provider block separately
+            await update.message.reply_text(f"Current: `{display}`", parse_mode="Markdown")
+            for chunk in chunks[1:-1]:
+                await update.message.reply_text(chunk, parse_mode="Markdown")
+            await update.message.reply_text("`/model auto` to reset", parse_mode="Markdown")
         return
 
     sub = args[0].lower()
@@ -159,7 +169,7 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     # /model <alias> — switch to specific model
-    models = await list_models()
+    models = await db_list_models()  # include inactive so user can explicitly switch
     aliases = [m["alias"] for m in models]
     if sub not in aliases:
         await update.message.reply_text(

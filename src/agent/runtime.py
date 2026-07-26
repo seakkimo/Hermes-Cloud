@@ -15,7 +15,9 @@ MAX_REPLY_CHARS = 3800  # Telegram limit is 4096, leave buffer
 # Models that do NOT support function calling — skip tool loop for these
 NO_TOOL_CALL_MODELS = {
     "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-3-nano-30b-a3b:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
     "nvidia/nemotron-nano-9b-v2:free",
