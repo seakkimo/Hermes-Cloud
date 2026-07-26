@@ -89,3 +89,7 @@ SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
 IMAP_HOST: str = os.getenv("IMAP_HOST", "imap.gmail.com")
 IMAP_PORT: int = int(os.getenv("IMAP_PORT", "993"))
+
+# NVIDIA NIM API
+NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
