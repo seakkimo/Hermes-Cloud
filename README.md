@@ -11,12 +11,15 @@ Bot (Commands + Messages)
    ↓
 Agent Runtime
    ├── LLM (Dynamic Model Registry → Supabase)
-   │     └── OpenRouter / OpenAI / Anthropic / Any Provider
+   │     └── OpenRouter / OpenAI / Anthropic / NVIDIA NIM
    ├── Memory (Supabase conversations)
    ├── Tools
    │     ├── Browser (Tavily + Google News RSS + Jina Reader)
    │     ├── News Agent (Google News RSS → LLM Summary)
-   │     └── Paper Agent (arXiv → LLM Summary)
+   │     ├── Paper Agent (arXiv → LLM Summary)
+   │     ├── Calendar (Supabase calendar table)
+   │     ├── Email (SMTP/IMAP)
+   │     └── Code Exec (Python subprocess sandbox)
    ├── MCP Server (FastAPI /mcp, Cline integration)
    └── Robot Bridge (WebSocket → WSL2 ROS2 → /cmd_vel)
         ↓
