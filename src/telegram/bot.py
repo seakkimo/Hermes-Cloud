@@ -40,7 +40,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/run` + 換行 + 多行程式碼 — 多行執行\n\n"
         "*其他*\n"
         "`/status` — 系統狀態\n"
-        "`/clear` — 清除對話記憶",
+        "`/clear` — 清除對話記憶\n"
+        "🎙 直接傳送語音訊息即可語音輸入",
         parse_mode="Markdown"
     )
 
@@ -396,6 +397,38 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle voice messages — transcribe with Whisper then pass to Agent."""
+    user_id = update.effective_user.id
+    voice = update.message.voice or update.message.audio
+    if not voice:
+        return
+
+    await update.message.chat.send_action("typing")
+    try:
+        # Download voice file
+        file = await context.bot.get_file(voice.file_id)
+        file_bytes = await file.download_as_bytearray()
+        filename = f"voice.{voice.mime_type.split('/')[-1]}" if hasattr(voice, 'mime_type') and voice.mime_type else "voice.ogg"
+
+        from src.tools.voice import transcribe
+        text = await transcribe(bytes(file_bytes), filename)
+
+        if not text:
+            await update.message.reply_text("⚠️ 無法辨識語音，請再試一次。")
+            return
+
+        # Echo transcription and reply
+        await update.message.reply_text(f"🎙 *辨識結果：*\n{text}", parse_mode="Markdown")
+        await update.message.chat.send_action("typing")
+        reply = await run(text, user_id=user_id)
+        await update.message.reply_text(reply)
+
+    except Exception as e:
+        logger.error(f"Voice handler error: {e}")
+        await update.message.reply_text("⚠️ 語音處理失敗，請稍後再試。")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     user_text = update.message.text
@@ -420,5 +453,6 @@ def build_app():
     app.add_handler(CommandHandler("calendar", calendar_command))
     app.add_handler(CommandHandler("email", email_command))
     app.add_handler(CommandHandler("run", run_command))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return app

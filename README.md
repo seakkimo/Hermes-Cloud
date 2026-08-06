@@ -47,6 +47,7 @@ Agent Runtime
 | V1.1 | Calendar + Email + Code Execution Tools | ✅ |
 | V1.2 | Calendar Reminder (daily push notification) | ✅ |
 | V1.3 | Memory Auto-Summarise (LLM compression) | ✅ |
+| V1.4 | Voice Input (Whisper transcription) | ✅ |
 
 ## Telegram Commands
 

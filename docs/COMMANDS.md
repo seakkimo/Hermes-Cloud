@@ -365,6 +365,22 @@ print(x + y)
 
 ---
 
+## 語音輸入（V1.4）
+
+直接在 Telegram 傳送語音訊息，無需任何指令。
+
+Hermes 會自動：
+1. 下載語音檔案
+2. 用 OpenAI Whisper 轉文字
+3. 顯示辨識結果
+4. 將文字送進 Agent 回覆
+
+支援格式：語音訊息（ogg）、音訊檔案（mp3、m4a 等）
+
+> 需在 Render 環境變數設定 `OPENAI_API_KEY`
+
+---
+
 ## 注意事項
 
 - `/model add` 若 alias 已存在則為更新（upsert）
