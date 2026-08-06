@@ -67,6 +67,53 @@ async def clear_history(user_id: int) -> None:
         logger.error(f"Memory clear error: {e}")
 
 
+async def count_history(user_id: int) -> int:
+    """Return total number of messages stored for this user."""
+    client = _get_client()
+    if not client:
+        return 0
+    try:
+        result = (
+            client.table("conversations")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return result.count or 0
+    except Exception as e:
+        logger.error(f"Memory count error: {e}")
+        return 0
+
+
+async def replace_history_with_summary(user_id: int, summary: str, keep_recent: int = 6) -> None:
+    """Delete old messages, keep the latest `keep_recent`, prepend a summary system message."""
+    client = _get_client()
+    if not client:
+        return
+    try:
+        # Get IDs of all messages ordered by time
+        result = (
+            client.table("conversations")
+            .select("id")
+            .eq("user_id", user_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        all_ids = [r["id"] for r in (result.data or [])]
+        # Keep only the last `keep_recent` IDs
+        ids_to_delete = all_ids[:-keep_recent] if len(all_ids) > keep_recent else []
+        if ids_to_delete:
+            client.table("conversations").delete().in_("id", ids_to_delete).execute()
+        # Insert summary as a system message at the top (oldest created_at trick: use insert)
+        client.table("conversations").insert({
+            "user_id": user_id,
+            "role": "system",
+            "content": f"[Conversation Summary]\n{summary}",
+        }).execute()
+    except Exception as e:
+        logger.error(f"Memory replace error: {e}")
+
+
 # ── Model registry (dynamic) ──────────────────────────────────────────────────
 
 async def db_list_models() -> list[dict]:

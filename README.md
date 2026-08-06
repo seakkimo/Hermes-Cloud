@@ -46,6 +46,7 @@ Agent Runtime
 | V1.0 | Dynamic Model Registry + Multi-Provider | ✅ |
 | V1.1 | Calendar + Email + Code Execution Tools | ✅ |
 | V1.2 | Calendar Reminder (daily push notification) | ✅ |
+| V1.3 | Memory Auto-Summarise (LLM compression) | ✅ |
 
 ## Telegram Commands
 

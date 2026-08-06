@@ -373,4 +373,5 @@ print(x + y)
 - nvidia provider 的 alias 建議加 `-nv` 後綴，方便與 openrouter 同名模型區分
 - `/email` 需設定 Gmail App Password（16位），非帳號密碼，申請：myaccount.google.com/apppasswords
 - `/run` 有 10 秒 timeout 保護，不能安裝額外套件，不能存取檔案系統
+- 對話記憶超過 20 則時自動用 LLM 壓縮成摘要，保留最新 6 則，避免 context 爆掉
 - Robot Bridge 需在 WSL2 本地端啟動 `bridge/bridge_agent.py`，每次 Render redeploy 後需重啟（建議用 `nohup` 背景執行）

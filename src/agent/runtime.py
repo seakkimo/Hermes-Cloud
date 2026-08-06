@@ -3,14 +3,16 @@ import logging
 from datetime import datetime, timezone, timedelta
 from src.llm.llm import chat, chat_with_tools
 from src.agent.session import get_model, is_auto, get_search_engine
-from src.memory.supabase import load_history, save_message
+from src.memory.supabase import load_history, save_message, count_history, replace_history_with_summary
 from src.tools.browser import fetch_page
 
 logger = logging.getLogger(__name__)
 
 TZ_TAIPEI = timezone(timedelta(hours=8))
 MAX_TOOL_ROUNDS = 3
-MAX_REPLY_CHARS = 3800  # Telegram limit is 4096, leave buffer
+MAX_REPLY_CHARS = 3800
+MEMORY_SUMMARY_THRESHOLD = 20  # compress when history exceeds this
+MEMORY_KEEP_RECENT = 6         # keep this many recent messages after compression
 
 # Models that do NOT support function calling — skip tool loop for these
 NO_TOOL_CALL_MODELS = {
@@ -64,6 +66,12 @@ async def run(
     force_browse: str = "",
     force_search: bool = False,
 ) -> str:
+    # ── Auto-summarise if history is too long ──────────────────────────────────
+    if user_id:
+        total = await count_history(user_id)
+        if total >= MEMORY_SUMMARY_THRESHOLD:
+            await _compress_history(user_id)
+
     history = await load_history(user_id)
     messages = [{"role": "system", "content": _system_prompt()}]
     messages += history
@@ -216,3 +224,30 @@ async def _run_search(query: str, engine: str = "tavily") -> str:
 async def _save(user_id: int, user_message: str, reply: str) -> None:
     await save_message(user_id, "user", user_message)
     await save_message(user_id, "assistant", reply)
+
+
+async def _compress_history(user_id: int) -> None:
+    """Summarise old conversation history with LLM, replace with compact version."""
+    try:
+        history = await load_history(user_id)
+        if not history:
+            return
+        # Build a plain-text transcript for the LLM to summarise
+        transcript = "\n".join(
+            f"{m['role'].upper()}: {m['content']}"
+            for m in history
+            if m["role"] in ("user", "assistant")
+        )
+        summary_prompt = [
+            {"role": "system", "content": "You are a helpful assistant that summarises conversations."},
+            {"role": "user", "content": (
+                "Please summarise the following conversation in 3-5 concise bullet points. "
+                "Focus on key topics, decisions, and context that would be useful to remember.\n\n"
+                f"{transcript}"
+            )},
+        ]
+        summary = await chat(summary_prompt)
+        await replace_history_with_summary(user_id, summary, keep_recent=MEMORY_KEEP_RECENT)
+        logger.info(f"[Memory] Compressed history for user {user_id} (summary inserted)")
+    except Exception as e:
+        logger.error(f"[Memory] Compression failed for user {user_id}: {e}")
