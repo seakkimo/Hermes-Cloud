@@ -156,6 +156,7 @@ Current: `auto`
 ## /calendar — 行事曆（V1.1）
 
 事件儲存於 Supabase `calendar` table，依使用者 ID 隔離。
+每天 08:00 自動推送未來 24 小時內的事件提醒。
 詳細說明：`docs/V1.1_FEATURES.md`
 
 ### 列出近期事件

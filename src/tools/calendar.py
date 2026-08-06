@@ -14,14 +14,13 @@ def _client():
 async def add_event(title: str, start: str, end: str = "", description: str = "", user_id: int = 0) -> str:
     """Add a calendar event. start/end format: YYYY-MM-DD HH:MM or YYYY-MM-DD"""
     try:
-        row = {
+        _client().table("calendar").insert({
             "user_id": user_id,
             "title": title,
             "start_time": start,
             "end_time": end or start,
             "description": description,
-        }
-        _client().table("calendar").insert(row).execute()
+        }).execute()
         return f"✅ Event added: **{title}** at {start}"
     except Exception as e:
         logger.error(f"Calendar add error: {e}")
@@ -74,3 +73,25 @@ async def delete_event(title: str, user_id: int = 0) -> str:
     except Exception as e:
         logger.error(f"Calendar delete error: {e}")
         return f"❌ Failed to delete event: {e}"
+
+
+async def get_due_reminders(hours_ahead: int = 24) -> list[dict]:
+    """
+    Return all events starting within the next `hours_ahead` hours, across ALL users.
+    Each item: {user_id, title, start_time, description}
+    """
+    try:
+        now = datetime.now(TZ_TAIPEI)
+        until = now + timedelta(hours=hours_ahead)
+        result = (
+            _client().table("calendar")
+            .select("user_id, title, start_time, description")
+            .gte("start_time", now.strftime("%Y-%m-%d %H:%M"))
+            .lte("start_time", until.strftime("%Y-%m-%d %H:%M"))
+            .order("start_time")
+            .execute()
+        )
+        return result.data or []
+    except Exception as e:
+        logger.error(f"Calendar reminder query error: {e}")
+        return []

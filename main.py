@@ -170,6 +170,32 @@ def run_webhook():
             result = await send_robot_command(command)
             return {"status": "ok", "task": task_name, "result": result}
 
+        elif task_name == "calendar_reminder":
+            from src.tools.calendar import get_due_reminders
+            events = await get_due_reminders(hours_ahead=24)
+            if not events:
+                return {"status": "ok", "task": task_name, "sent": 0}
+            # Group by user_id
+            by_user: dict[int, list] = {}
+            for e in events:
+                by_user.setdefault(e["user_id"], []).append(e)
+            sent = 0
+            for uid, user_events in by_user.items():
+                lines = ["\U0001f514 *upcoming events reminder*\n"]
+                for e in user_events:
+                    desc = f" — {e['description']}" if e.get("description") else ""
+                    lines.append(f"\u2022 {e['start_time']} | {e['title']}{desc}")
+                try:
+                    await tg_app.bot.send_message(
+                        chat_id=uid,
+                        text="\n".join(lines),
+                        parse_mode="Markdown",
+                    )
+                    sent += 1
+                except Exception as e:
+                    logger.error(f"Failed to send reminder to {uid}: {e}")
+            return {"status": "ok", "task": task_name, "sent": sent}
+
         return {"status": "ok", "task": task_name}
 
     @web.post("/webhook")

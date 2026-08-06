@@ -26,7 +26,8 @@ Agent Runtime
    Scheduler (GitHub Actions)
         ├── Keep-Alive (every 14 min)
         ├── News (daily 08:00 UTC+8)
-        └── Paper (daily 08:30 UTC+8)
+        ├── Paper (daily 08:30 UTC+8)
+        └── Calendar Reminder (daily 08:00 UTC+8)
 ```
 
 ## Roadmap
@@ -44,6 +45,7 @@ Agent Runtime
 | V0.9 | Robot Tool (ROS2 Bridge) | ✅ |
 | V1.0 | Dynamic Model Registry + Multi-Provider | ✅ |
 | V1.1 | Calendar + Email + Code Execution Tools | ✅ |
+| V1.2 | Calendar Reminder (daily push notification) | ✅ |
 
 ## Telegram Commands
 
