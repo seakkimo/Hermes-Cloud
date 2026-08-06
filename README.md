@@ -48,6 +48,7 @@ Agent Runtime
 | V1.2 | Calendar Reminder (daily push notification) | ✅ |
 | V1.3 | Memory Auto-Summarise (LLM compression) | ✅ |
 | V1.4 | Voice Input (Whisper transcription) | ✅ |
+| V1.5 | Image Input (Vision model analysis) | ✅ |
 
 ## Telegram Commands
 

@@ -1,3 +1,4 @@
+import base64
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -41,7 +42,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*其他*\n"
         "`/status` — 系統狀態\n"
         "`/clear` — 清除對話記憶\n"
-        "🎙 直接傳送語音訊息即可語音輸入",
+        "🎙 直接傳送語音訊息即可語音輸入\n"
+        "🖼 直接傳送圖片（可附說明文字）即可圖片分析",
         parse_mode="Markdown"
     )
 
@@ -397,6 +399,24 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle photo messages — send image + caption to Agent via vision model."""
+    user_id = update.effective_user.id
+    photo = update.message.photo[-1]  # largest resolution
+    caption = update.message.caption or ""
+
+    await update.message.chat.send_action("typing")
+    try:
+        file = await context.bot.get_file(photo.file_id)
+        file_bytes = await file.download_as_bytearray()
+        image_b64 = base64.b64encode(file_bytes).decode()
+        reply = await run(caption, user_id=user_id, image_b64=image_b64, image_mime="image/jpeg")
+        await update.message.reply_text(reply)
+    except Exception as e:
+        logger.error(f"Photo handler error: {e}")
+        await update.message.reply_text("⚠️ 圖片處理失敗，請稍後再試。")
+
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle voice messages — transcribe with Whisper then pass to Agent."""
     user_id = update.effective_user.id
@@ -454,5 +474,6 @@ def build_app():
     app.add_handler(CommandHandler("email", email_command))
     app.add_handler(CommandHandler("run", run_command))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return app

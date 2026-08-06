@@ -60,11 +60,25 @@ def _needs_search(user_message: str) -> bool:
     return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
 
 
+VISION_MODELS = {
+    "google/gemma-4-31b-it:free",
+    "google/gemma-3-27b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "meta-llama/llama-4-scout:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "openai/gpt-oss-120b:free",
+    "openai/gpt-oss-20b:free",
+    "qwen/qwen3-coder:free",
+}
+
+
 async def run(
     user_message: str,
     user_id: int = 0,
     force_browse: str = "",
     force_search: bool = False,
+    image_b64: str = "",
+    image_mime: str = "image/jpeg",
 ) -> str:
     # ── Auto-summarise if history is too long ──────────────────────────────────
     if user_id:
@@ -99,10 +113,26 @@ async def run(
         return _truncate(reply)
 
     # ── Agent Loop (Function Calling) ─────────────────────────────────────────
-    messages.append({"role": "user", "content": user_message})
+    if image_b64:
+        user_content = [
+            {"type": "image_url", "image_url": {"url": f"data:{image_mime};base64,{image_b64}"}},
+            {"type": "text", "text": user_message or "請描述這張圖片"},
+        ]
+        messages.append({"role": "user", "content": user_content})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     model_alias = "" if is_auto(user_id) else get_model(user_id)
     fallback = is_auto(user_id)
+
+    # Vision: prefer a known vision model in auto mode
+    if image_b64 and fallback:
+        from src.llm.llm import list_models
+        active = await list_models()
+        vision_candidate = next((m for m in active if m["model_id"] in VISION_MODELS), None)
+        if vision_candidate:
+            model_alias = vision_candidate["alias"]
+            fallback = True  # still allow fallback if vision model fails
 
     from src.llm.llm import get_model_by_alias
     use_tools = True
