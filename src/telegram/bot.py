@@ -36,7 +36,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/email read <no>` — 讀取第 N 封完整內文\n"
         "`/email send <to> <subject> | <body>` — 發送郵件\n\n"
         "*程式執行*\n"
-        "`/run <python code>` — 執行 Python 程式碼\n\n"
+        "`/run <code>` — 單行執行\n"
+        "`/run` + 換行 + 多行程式碼 — 多行執行\n\n"
         "*其他*\n"
         "`/status` — 系統狀態\n"
         "`/clear` — 清除對話記憶",
@@ -357,10 +358,38 @@ async def email_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not context.args:
-        await update.message.reply_text("Usage: `/run <python code>`", parse_mode="Markdown")
+    # Extract code from raw message text to preserve newlines
+    raw = update.message.text or ""
+    # Strip the /run command prefix (handle /run@botname too)
+    if "\n" in raw:
+        # Multi-line: everything after the first line's command
+        first_newline = raw.index("\n")
+        code = raw[first_newline + 1:].strip()
+        # Also grab anything on the same line as /run
+        first_line_rest = raw[:first_newline].split(None, 1)
+        if len(first_line_rest) > 1:
+            code = first_line_rest[1] + "\n" + code
+    else:
+        # Single line: use args as before
+        if not context.args:
+            await update.message.reply_text(
+                "Usage:\n`/run <code>` — single line\n"
+                "Or send multi-line code:\n"
+                "`/run`\n"
+                "`line1`\n"
+                "`line2`",
+                parse_mode="Markdown"
+            )
+            return
+        code = " ".join(context.args)
+
+    if not code.strip():
+        await update.message.reply_text(
+            "Usage: `/run <code>` or send `/run` followed by code on next lines",
+            parse_mode="Markdown"
+        )
         return
-    code = " ".join(context.args)
+
     await update.message.chat.send_action("typing")
     from src.tools.code_exec import execute_python
     result = await execute_python(code)

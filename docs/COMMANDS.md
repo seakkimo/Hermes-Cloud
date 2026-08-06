@@ -313,6 +313,8 @@ Reply: `OK`
 在沙盒環境執行 Python 程式碼，timeout 10 秒，輸出上限 2000 字元。
 詳細說明：`docs/V1.1_FEATURES.md`
 
+### 單行執行
+
 ```
 /run <python code>
 ```
@@ -322,7 +324,35 @@ Reply: `OK`
 /run print(sum(range(1, 101)))
 /run import math; print(math.sqrt(144))
 /run from datetime import datetime; print(datetime.now())
-/run import json; print(json.dumps({'name':'Hermes','v':1.1}, indent=2))
+```
+
+### 多行執行
+
+`/run` 後換行，直接輸入多行程式碼：
+
+```
+/run
+x = [1, 2, 3, 4, 5]
+total = sum(x)
+print(f'Sum: {total}, Avg: {total/len(x)}')
+```
+
+```
+/run
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        print(a, end=' ')
+        a, b = b, a+b
+fib(10)
+```
+
+也可以第一行後接程式碼，後續行繼續：
+
+```
+/run x = 10
+y = 20
+print(x + y)
 ```
 
 ### 自然語言用法（不需下指令）
