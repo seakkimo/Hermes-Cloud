@@ -1,18 +1,12 @@
-"""Voice transcription — Telegram voice/audio → OpenAI Whisper → text."""
+"""Voice transcription — Telegram voice/audio → Groq Whisper → text."""
 import logging
 import tempfile
 import os
-from openai import AsyncOpenAI
-from config.settings import OPENROUTER_API_KEY
+from groq import AsyncGroq
 
 logger = logging.getLogger(__name__)
 
-# Whisper uses OpenAI directly (not OpenRouter — OpenRouter doesn't support audio)
-_whisper_client = AsyncOpenAI(
-    api_key=os.getenv("OPENAI_API_KEY") or OPENROUTER_API_KEY,
-    base_url="https://api.openai.com/v1",
-    max_retries=0,
-)
+_groq_client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
 
 
 async def transcribe(file_bytes: bytes, filename: str = "voice.ogg") -> str:
@@ -23,8 +17,8 @@ async def transcribe(file_bytes: bytes, filename: str = "voice.ogg") -> str:
             tmp_path = f.name
         try:
             with open(tmp_path, "rb") as audio_file:
-                response = await _whisper_client.audio.transcriptions.create(
-                    model="whisper-1",
+                response = await _groq_client.audio.transcriptions.create(
+                    model="whisper-large-v3-turbo",
                     file=audio_file,
                     response_format="text",
                 )

@@ -94,5 +94,5 @@ IMAP_PORT: int = int(os.getenv("IMAP_PORT", "993"))
 NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
-# OpenAI (for Whisper voice transcription)
-OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+# Groq (for Whisper voice transcription)
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
