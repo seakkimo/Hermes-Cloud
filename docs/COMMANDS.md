@@ -232,6 +232,32 @@ Current: `auto`
 /email inbox 10
 ```
 
+輸出範例：
+```
+[1] Mon, 14 Jul 2025
+    From: sender@gmail.com
+    Subject: 會議通知
+[2] Sun, 13 Jul 2025
+    From: news@example.com
+    Subject: 每週電子報
+```
+
+### 讀取完整內文
+
+```
+/email read <no>
+```
+
+| 參數 | 說明 |
+|------|------|
+| no | inbox 列表的序號，1 = 最新一封 |
+
+範例：
+```
+/email read 1     ← 讀最新一封的完整內文
+/email read 3     ← 讀第 3 封的完整內文
+```
+
 ### 發送郵件
 
 ```

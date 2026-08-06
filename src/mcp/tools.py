@@ -3,7 +3,7 @@ from src.tools.browser import search, fetch_page
 from src.tools.news import run as news_run
 from src.tools.paper import run as paper_run
 from src.tools.calendar import add_event, list_events, delete_event
-from src.tools.email_tool import send_email, read_emails
+from src.tools.email_tool import send_email, read_emails, read_email_body
 from src.tools.code_exec import execute_python
 from src.memory.supabase import load_history
 
@@ -158,13 +158,25 @@ def setup():
 
     register(Tool(
         name="email_read",
-        description="Read the latest emails from inbox.",
+        description="Read the latest emails from inbox, with index numbers.",
         func=read_emails,
         parameters={
             "count": {"type": "integer", "description": "Number of emails to read, default 5"},
             "folder": {"type": "string", "description": "Mailbox folder, default INBOX"},
         },
         required=[],
+    ))
+
+    register(Tool(
+        name="email_read_body",
+        description="Read the full body of a specific email by its index number (1=latest). Use after email_read to get full content.",
+        func=read_email_body,
+        parameters={
+            "index": {"type": "integer", "description": "Email index from inbox list, 1=latest"},
+            "count": {"type": "integer", "description": "Pool size to pick from, default 5"},
+            "folder": {"type": "string", "description": "Mailbox folder, default INBOX"},
+        },
+        required=["index"],
     ))
 
     register(Tool(

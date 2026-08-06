@@ -32,6 +32,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/calendar del <title>` — 刪除事件\n\n"
         "*Email*\n"
         "`/email inbox [count]` — 讀取收件匣\n"
+        "`/email read <no>` — 讀取第 N 封完整內文\n"
         "`/email send <to> <subject> | <body>` — 發送郵件\n\n"
         "*程式執行*\n"
         "`/run <python code>` — 執行 Python 程式碼\n\n"
@@ -288,13 +289,19 @@ async def email_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     sub = args[0].lower()
-    from src.tools.email_tool import read_emails, send_email
+    from src.tools.email_tool import read_emails, read_email_body, send_email
 
     if sub == "inbox":
         count = int(args[1]) if len(args) > 1 and args[1].isdigit() else 5
         await update.message.chat.send_action("typing")
         result = await read_emails(count=count)
         await update.message.reply_text(result)
+
+    elif sub == "read":
+        index = int(args[1]) if len(args) > 1 and args[1].isdigit() else 1
+        await update.message.chat.send_action("typing")
+        result = await read_email_body(index=index)
+        await update.message.reply_text(result, parse_mode="Markdown")
 
     elif sub == "send":
         # /email send <to> <subject> | <body>
