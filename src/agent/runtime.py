@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone, timedelta
@@ -11,10 +12,9 @@ logger = logging.getLogger(__name__)
 TZ_TAIPEI = timezone(timedelta(hours=8))
 MAX_TOOL_ROUNDS = 3
 MAX_REPLY_CHARS = 3800
-MEMORY_SUMMARY_THRESHOLD = 20  # compress when history exceeds this
-MEMORY_KEEP_RECENT = 6         # keep this many recent messages after compression
+MEMORY_SUMMARY_THRESHOLD = 20
+MEMORY_KEEP_RECENT = 6
 
-# Models that do NOT support function calling — skip tool loop for these
 NO_TOOL_CALL_MODELS = {
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3-ultra-550b-a55b",
@@ -104,8 +104,6 @@ async def run(
     model_alias = "" if is_auto(user_id) else get_model(user_id)
     fallback = is_auto(user_id)
 
-    # In auto mode, check if ALL available models don't support tool calling
-    # If so, fall back to keyword-based routing
     from src.llm.llm import get_model_by_alias
     use_tools = True
     if not fallback and model_alias:
@@ -113,7 +111,6 @@ async def run(
         if m and m["model_id"] in NO_TOOL_CALL_MODELS:
             use_tools = False
     elif fallback:
-        # Check if any active model supports tool calling
         from src.llm.llm import list_models
         active = await list_models()
         supporting = [m for m in active if m["model_id"] not in NO_TOOL_CALL_MODELS]
@@ -122,7 +119,6 @@ async def run(
             logger.info("No tool-calling models available, using keyword routing")
 
     if not use_tools:
-        # Keyword-based routing when no tool-calling model available
         needs_web = _needs_search(user_message)
         if needs_web:
             engine = get_search_engine(user_id)
@@ -155,44 +151,33 @@ async def run(
         tool_calls = response.get("tool_calls")
         content = response.get("content") or ""
 
-        # No tool call → final answer
         if not tool_calls:
             reply = content
             break
 
-        # Sanity check: ignore tool calls with empty/invalid function names
         tool_calls = [tc for tc in tool_calls if tc.get("function", {}).get("name")]
         if not tool_calls:
             reply = content
             break
 
-        # Execute all tool calls in this round
+        # ── Parallel tool execution ────────────────────────────────────────────
         messages.append({
             "role": "assistant",
             "content": content or None,
             "tool_calls": tool_calls,
         })
 
-        for tc in tool_calls:
-            tool_name = tc["function"]["name"]
-            try:
-                arguments = json.loads(tc["function"]["arguments"])
-            except Exception:
-                arguments = {}
+        results = await asyncio.gather(*[
+            _exec_tool(tc, call_tool, round_num) for tc in tool_calls
+        ])
 
-            logger.info(f"[Agent Loop round {round_num+1}] calling tool: {tool_name}({arguments})")
-            try:
-                result = await call_tool(tool_name, arguments)
-            except Exception as e:
-                result = f"Tool error: {e}"
-
+        for tool_call_id, result_str in results:
             messages.append({
                 "role": "tool",
-                "tool_call_id": tc["id"],
-                "content": str(result),
+                "tool_call_id": tool_call_id,
+                "content": result_str,
             })
     else:
-        # Exceeded max rounds — summarise
         reply = await _llm(messages, user_id)
 
     if not reply:
@@ -203,6 +188,21 @@ async def run(
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _exec_tool(tc: dict, call_tool, round_num: int) -> tuple[str, str]:
+    """Execute one tool call concurrently. Returns (tool_call_id, result_str)."""
+    tool_name = tc["function"]["name"]
+    try:
+        arguments = json.loads(tc["function"]["arguments"])
+    except Exception:
+        arguments = {}
+    logger.info(f"[Agent Loop round {round_num+1}] calling tool: {tool_name}({arguments})")
+    try:
+        result = await call_tool(tool_name, arguments)
+    except Exception as e:
+        result = f"Tool error: {e}"
+    return tc["id"], str(result)
+
 
 async def _llm(messages: list[dict], user_id: int) -> str:
     if is_auto(user_id):
@@ -232,7 +232,6 @@ async def _compress_history(user_id: int) -> None:
         history = await load_history(user_id)
         if not history:
             return
-        # Build a plain-text transcript for the LLM to summarise
         transcript = "\n".join(
             f"{m['role'].upper()}: {m['content']}"
             for m in history
