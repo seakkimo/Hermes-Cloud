@@ -5,7 +5,7 @@ from config.settings import TELEGRAM_BOT_TOKEN, OPENROUTER_BASE_URL
 from src.agent.runtime import run
 from src.agent.session import get_model, set_model, AUTO_MODEL, get_search_engine, set_search_engine
 from src.memory.supabase import clear_history, db_list_models, db_add_model, db_remove_model, db_toggle_model
-from src.llm.llm import invalidate_cache, list_models
+from src.llm.llm import invalidate_cache, list_models, test_model
 from src.tools.browser import SEARCH_ENGINES
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/model add <alias> <model_id> <provider> [priority]` — 新增模型\n"
         "`/model remove <alias>` — 刪除模型\n"
         "`/model on <alias>` — 啟用模型\n"
-        "`/model off <alias>` — 停用模型\n\n"
+        "`/model off <alias>` — 停用模型\n"
+        "`/model test [alias]` — 測試模型可用性和延遲\n\n"
         "*搜尋*\n"
         "`/search list` — 列出搜尋引擎\n"
         "`/search <engine>` — 切換搜尋引擎\n"
@@ -156,6 +157,39 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await db_toggle_model(alias, True)
         invalidate_cache()
         await update.message.reply_text(f"✅ Model `{alias}` enabled.", parse_mode="Markdown")
+        return
+
+    # /model test [alias]
+    if sub == "test":
+        alias = args[1].lower() if len(args) > 1 else get_model(user_id)
+        if alias == AUTO_MODEL or not alias:
+            await update.message.reply_text(
+                "Usage: `/model test <alias>`\nOr switch to a specific model first with `/model <alias>`",
+                parse_mode="Markdown"
+            )
+            return
+        await update.message.chat.send_action("typing")
+        result = await test_model(alias)
+        status_icon = {
+            "ok": "\u2705",
+            "rate_limited": "\u26a0\ufe0f",
+            "not_found": "\u274c",
+            "not_found_api": "\u274c",
+            "error": "\u274c",
+        }.get(result["status"], "\u2753")
+        lines = [
+            f"{status_icon} *Model Test: `{alias}`*",
+            f"Model: `{result.get('model_id', 'N/A')}`",
+            f"Provider: `{result.get('provider', 'N/A')}`",
+            f"Status: `{result['status']}`",
+        ]
+        if result.get("latency_ms") is not None:
+            lines.append(f"Latency: `{result['latency_ms']} ms`")
+        if result.get("reply"):
+            lines.append(f"Reply: `{result['reply']}`")
+        if result.get("error"):
+            lines.append(f"Error: `{result['error'][:200]}`")
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
         return
 
     # /model off <alias>

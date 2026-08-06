@@ -1,4 +1,5 @@
 import logging
+import time
 from openai import AsyncOpenAI, RateLimitError, NotFoundError
 from config.settings import OPENROUTER_API_KEY, OPENROUTER_BASE_URL
 
@@ -171,3 +172,46 @@ def _parse_tool_calls(msg) -> list[dict] | None:
         }
         for tc in msg.tool_calls
     ]
+
+
+async def test_model(alias: str) -> dict:
+    """
+    Test a model by alias. Returns:
+      {alias, model_id, provider, status, latency_ms, error}
+    """
+    from src.memory.supabase import db_list_models
+    models = await db_list_models()
+    row = next((m for m in models if m["alias"] == alias), None)
+    if not row:
+        return {"alias": alias, "status": "not_found", "error": f"Alias '{alias}' not in DB"}
+
+    client = _make_client(row)
+    t0 = time.monotonic()
+    try:
+        response = await client.chat.completions.create(
+            model=row["model_id"],
+            messages=[{"role": "user", "content": "Reply with one word: OK"}],
+            max_tokens=5,
+        )
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        reply = (response.choices[0].message.content or "").strip()
+        return {
+            "alias": alias,
+            "model_id": row["model_id"],
+            "provider": row["provider"],
+            "status": "ok",
+            "latency_ms": latency_ms,
+            "reply": reply,
+        }
+    except RateLimitError as e:
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"alias": alias, "model_id": row["model_id"], "provider": row["provider"],
+                "status": "rate_limited", "latency_ms": latency_ms, "error": str(e)}
+    except NotFoundError as e:
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"alias": alias, "model_id": row["model_id"], "provider": row["provider"],
+                "status": "not_found_api", "latency_ms": latency_ms, "error": str(e)}
+    except Exception as e:
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {"alias": alias, "model_id": row["model_id"], "provider": row["provider"],
+                "status": "error", "latency_ms": latency_ms, "error": str(e)}

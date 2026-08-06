@@ -115,6 +115,32 @@ Current: `auto`
 /model off <alias>
 ```
 
+### 測試模型
+
+```
+/model test <alias>
+```
+
+發送一個最小 prompt 測試模型可用性，回傳延遲時間和狀態。
+
+輸出範例：
+```
+✅ Model Test: `gemma`
+Model: `google/gemma-4-31b-it:free`
+Provider: `openrouter`
+Status: `ok`
+Latency: `1243 ms`
+Reply: `OK`
+```
+
+狀態說明：
+| Status | 說明 |
+|--------|------|
+| `ok` | 模型可用 |
+| `rate_limited` | 設到限流（429） |
+| `not_found_api` | 模型 ID 不存在（404） |
+| `error` | 其他錯誤 |
+
 ---
 
 ## /search — 搜尋引擎管理
