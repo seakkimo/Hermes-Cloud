@@ -6,7 +6,13 @@ from groq import AsyncGroq
 
 logger = logging.getLogger(__name__)
 
-_groq_client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
+_groq_client: AsyncGroq | None = None
+
+def _get_client() -> AsyncGroq:
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
+    return _groq_client
 
 
 async def transcribe(file_bytes: bytes, filename: str = "voice.ogg") -> str:
@@ -17,7 +23,7 @@ async def transcribe(file_bytes: bytes, filename: str = "voice.ogg") -> str:
             tmp_path = f.name
         try:
             with open(tmp_path, "rb") as audio_file:
-                response = await _groq_client.audio.transcriptions.create(
+                response = await _get_client().audio.transcriptions.create(
                     model="whisper-large-v3-turbo",
                     file=audio_file,
                     response_format="text",
