@@ -196,6 +196,48 @@ def run_webhook():
                     logger.error(f"Failed to send reminder to {uid}: {e}")
             return {"status": "ok", "task": task_name, "sent": sent}
 
+        elif task_name == "proactive":
+            slot = data.get("slot", "")
+            from src.memory.supabase import get_supabase_client
+            from src.agent.runtime import run as agent_run
+            from src.tools.weather import get_weather
+
+            sb = get_supabase_client()
+            rows = (
+                sb.table("scheduled_tasks")
+                .select("name, prompt")
+                .eq("enabled", True)
+                .eq("cron_label", f"{slot} UTC+8")
+                .execute()
+            ).data or []
+
+            if not rows:
+                return {"status": "ok", "task": task_name, "slot": slot, "ran": 0}
+
+            ran = 0
+            for t in rows:
+                try:
+                    if t["name"] == "weather":
+                        weather_data = await get_weather()
+                        prompt = f"以下是即時天氣資料：\n{weather_data}\n\n{t['prompt']}"
+                    elif t["name"] == "todo_reminder":
+                        from src.tools.todo import list_todos
+                        todos = await list_todos(user_id=TELEGRAM_OWNER_CHAT_ID)
+                        prompt = f"以下是目前的待辦事項：\n{todos}\n\n{t['prompt']}"
+                    else:
+                        prompt = t["prompt"]
+
+                    reply = await agent_run(prompt, user_id=TELEGRAM_OWNER_CHAT_ID)
+                    await tg_app.bot.send_message(
+                        chat_id=TELEGRAM_OWNER_CHAT_ID,
+                        text=reply,
+                        parse_mode="Markdown",
+                    )
+                    ran += 1
+                except Exception as e:
+                    logger.error(f"Proactive task '{t['name']}' error: {e}")
+            return {"status": "ok", "task": task_name, "slot": slot, "ran": ran}
+
         return {"status": "ok", "task": task_name}
 
     @web.post("/webhook")

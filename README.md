@@ -27,7 +27,8 @@ Agent Runtime
         ├── Keep-Alive (every 14 min)
         ├── News (daily 08:00 UTC+8)
         ├── Paper (daily 08:30 UTC+8)
-        └── Calendar Reminder (daily 08:00 UTC+8)
+        ├── Calendar Reminder (daily 08:00 UTC+8)
+        └── Proactive Agent (07:30 / 08:00 / 19:00 UTC+8)
 ```
 
 ## Roadmap
@@ -50,6 +51,7 @@ Agent Runtime
 | V1.4 | Voice Input (Whisper transcription) | ✅ |
 | V1.5 | Image Input (Vision model analysis) | ✅ |
 | V1.6 | Todo List (Supabase todos table) | ✅ |
+| V1.7 | Proactive Agent (scheduled push notifications) | ✅ |
 
 ## Telegram Commands
 

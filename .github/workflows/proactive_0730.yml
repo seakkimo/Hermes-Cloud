@@ -1,0 +1,18 @@
+name: Proactive 07:30
+
+on:
+  schedule:
+    # 23:30 UTC = 07:30 UTC+8
+    - cron: "30 23 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger proactive tasks (07:30 slot)
+        run: |
+          curl -f -X POST ${{ secrets.RENDER_URL }}/task \
+            -H "Content-Type: application/json" \
+            -H "x-scheduler-secret: ${{ secrets.SCHEDULER_SECRET }}" \
+            -d '{"task": "proactive", "slot": "07:30"}'
