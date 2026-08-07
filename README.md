@@ -49,6 +49,7 @@ Agent Runtime
 | V1.3 | Memory Auto-Summarise (LLM compression) | ✅ |
 | V1.4 | Voice Input (Whisper transcription) | ✅ |
 | V1.5 | Image Input (Vision model analysis) | ✅ |
+| V1.6 | Todo List (Supabase todos table) | ✅ |
 
 ## Telegram Commands
 
@@ -67,6 +68,11 @@ Agent Runtime
 | `/search <engine>` | Switch search engine (tavily / news) |
 | `/browse <url>` | Fetch and summarize a webpage |
 | `/browse <keywords>` | Force web search |
+| `/todo list` | List pending todos |
+| `/todo all` | List all todos (including done) |
+| `/todo add <title>` | Add todo item |
+| `/todo done <title>` | Mark todo as done |
+| `/todo del <title>` | Delete todo item |
 | `/calendar list [days]` | List upcoming events |
 | `/calendar add <title> <date>` | Add calendar event |
 | `/calendar del <title>` | Delete calendar event |

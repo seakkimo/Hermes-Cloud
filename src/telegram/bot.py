@@ -8,6 +8,7 @@ from src.agent.session import get_model, set_model, AUTO_MODEL, get_search_engin
 from src.memory.supabase import clear_history, db_list_models, db_add_model, db_remove_model, db_toggle_model
 from src.llm.llm import invalidate_cache, list_models, test_model
 from src.tools.browser import SEARCH_ENGINES
+from src.tools.todo import add_todo, list_todos, complete_todo, delete_todo
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/status` — 系統狀態\n"
         "`/clear` — 清除對話記憶\n"
         "🎙 直接傳送語音訊息即可語音輸入\n"
-        "🖼 直接傳送圖片（可附說明文字）即可圖片分析",
+        "🖼 直接傳送圖片（可附說明文字）即可圖片分析\n\n"
+        "*Todo*\n"
+        "`/todo list` — 列出待辦\n"
+        "`/todo all` — 全部（含已完成）\n"
+        "`/todo add <title>` — 新增\n"
+        "`/todo done <title>` — 標記完成\n"
+        "`/todo del <title>` — 刪除",
         parse_mode="Markdown"
     )
 
@@ -274,6 +281,52 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text("🧹 Conversation history cleared.")
 
 
+async def todo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Usage:\n`/todo list` — 待辦\n`/todo all` — 全部\n"
+            "`/todo add <title>` — 新增\n`/todo done <title>` — 完成\n`/todo del <title>` — 刪除",
+            parse_mode="Markdown"
+        )
+        return
+
+    sub = args[0].lower()
+
+    if sub == "list":
+        result = await list_todos(user_id=user_id)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    elif sub == "all":
+        result = await list_todos(user_id=user_id, show_done=True)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    elif sub == "add":
+        if len(args) < 2:
+            await update.message.reply_text("Usage: `/todo add <title>`", parse_mode="Markdown")
+            return
+        result = await add_todo(title=" ".join(args[1:]), user_id=user_id)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    elif sub == "done":
+        if len(args) < 2:
+            await update.message.reply_text("Usage: `/todo done <title>`", parse_mode="Markdown")
+            return
+        result = await complete_todo(title=" ".join(args[1:]), user_id=user_id)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    elif sub == "del":
+        if len(args) < 2:
+            await update.message.reply_text("Usage: `/todo del <title>`", parse_mode="Markdown")
+            return
+        result = await delete_todo(title=" ".join(args[1:]), user_id=user_id)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    else:
+        await update.message.reply_text("Unknown subcommand. Use `list`, `all`, `add`, `done`, or `del`.", parse_mode="Markdown")
+
+
 async def calendar_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     args = context.args
@@ -470,6 +523,7 @@ def build_app():
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler("clear", clear_command))
     app.add_handler(CommandHandler("browse", browse_command))
+    app.add_handler(CommandHandler("todo", todo_command))
     app.add_handler(CommandHandler("calendar", calendar_command))
     app.add_handler(CommandHandler("email", email_command))
     app.add_handler(CommandHandler("run", run_command))

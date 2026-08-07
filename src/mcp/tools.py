@@ -3,6 +3,7 @@ from src.tools.browser import search, fetch_page
 from src.tools.news import run as news_run
 from src.tools.paper import run as paper_run
 from src.tools.calendar import add_event, list_events, delete_event
+from src.tools.todo import add_todo, list_todos, complete_todo, delete_todo
 from src.tools.email_tool import send_email, read_emails, read_email_body
 from src.tools.code_exec import execute_python
 from src.memory.supabase import load_history
@@ -177,6 +178,52 @@ def setup():
             "folder": {"type": "string", "description": "Mailbox folder, default INBOX"},
         },
         required=["index"],
+    ))
+
+    # ── V1.6 Todo Tools ───────────────────────────────────────────────────────
+
+    register(Tool(
+        name="todo_add",
+        description="Add a new todo task.",
+        func=add_todo,
+        parameters={
+            "title": {"type": "string", "description": "Task title"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["title", "user_id"],
+    ))
+
+    register(Tool(
+        name="todo_list",
+        description="List todo tasks. By default shows only pending (undone) tasks.",
+        func=list_todos,
+        parameters={
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+            "show_done": {"type": "boolean", "description": "Include completed tasks, default false"},
+        },
+        required=["user_id"],
+    ))
+
+    register(Tool(
+        name="todo_done",
+        description="Mark a todo task as completed by title (partial match).",
+        func=complete_todo,
+        parameters={
+            "title": {"type": "string", "description": "Task title to mark done (partial match)"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["title", "user_id"],
+    ))
+
+    register(Tool(
+        name="todo_delete",
+        description="Delete a todo task by title (partial match).",
+        func=delete_todo,
+        parameters={
+            "title": {"type": "string", "description": "Task title to delete (partial match)"},
+            "user_id": {"type": "integer", "description": "Telegram user ID"},
+        },
+        required=["title", "user_id"],
     ))
 
     register(Tool(
