@@ -33,21 +33,34 @@ def extract_article(text: str) -> str:
 def extract_vocab(text: str) -> list[str]:
     """Extract vocabulary words from markdown table (first column)."""
     words = []
+    in_table = False
+    header_skipped = False
     for line in text.splitlines():
-        # Match markdown table rows: | word | ...
-        if not line.strip().startswith("|"):
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if in_table:
+                break  # table ended
             continue
-        cols = [c.strip() for c in line.strip().strip("|").split("|")]
+        in_table = True
+        cols = [c.strip() for c in stripped.strip("|").split("|")]
         if not cols:
             continue
         word = cols[0].strip()
-        # Skip header/separator rows
-        if not word or word.startswith("-") or word.lower() in ("單字 / 片語", "word", "vocab"):
+        # Skip separator rows (---|---)
+        if set(word.replace("-", "").replace(" ", "")) <= set("-"):
             continue
-        # Keep only the base word (before space or /)
-        base = re.split(r'[/\s]', word)[0].strip()
-        if base and base.isascii() and base.replace("-", "").isalpha():
-            words.append(base)
+        # Skip header row (contains Chinese or known header keywords)
+        has_chinese = any('\u4e00' <= c <= '\u9fff' for c in word)
+        if has_chinese or word.lower() in ("word", "vocab", "term"):
+            header_skipped = True
+            continue
+        if not header_skipped:
+            header_skipped = True  # treat first row as header
+            continue
+        # Accept English words and short phrases (allow spaces and hyphens)
+        clean = re.sub(r'[^a-zA-Z\s\-]', '', word).strip()
+        if clean and 1 <= len(clean.split()) <= 3:
+            words.append(clean)
     return words[:8]  # max 8 buttons
 
 
