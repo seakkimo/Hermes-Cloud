@@ -1,8 +1,7 @@
 """TTS tool — edge-tts, no API key required."""
-import asyncio
+import re
 import tempfile
 import os
-import re
 import edge_tts
 
 VOICE_FEMALE_EN = "en-US-JennyNeural"
@@ -13,39 +12,43 @@ RATE_NORMAL = "+0%"
 RATE_SLOW   = "-25%"
 
 
-def extract_english(text: str) -> str:
-    """Keep only lines that are predominantly English (for TTS)."""
-    lines = text.splitlines()
-    en_lines = []
-    for line in lines:
+def extract_article(text: str) -> str:
+    """Extract only the main English sentence/article (inside quotes or first English block)."""
+    # Try to find quoted English sentence first: "..." or 「...」
+    match = re.search(r'["\u201c]([A-Z][^"\u201d]{20,})["\u201d]', text)
+    if match:
+        return match.group(1).strip()
+    # Fallback: first line that is mostly English and long enough
+    for line in text.splitlines():
         stripped = line.strip()
-        if not stripped:
+        if len(stripped) < 20:
             continue
-        # Count ASCII letters vs total chars
         ascii_count = sum(1 for c in stripped if c.isascii() and c.isalpha())
         total_alpha = sum(1 for c in stripped if c.isalpha())
-        if total_alpha == 0:
-            continue
-        if ascii_count / total_alpha >= 0.6:
-            en_lines.append(stripped)
-    return "\n".join(en_lines) if en_lines else text
+        if total_alpha > 0 and ascii_count / total_alpha >= 0.8:
+            return stripped
+    return ""
 
 
-def extract_chinese(text: str) -> str:
-    """Keep only lines that are predominantly Chinese."""
-    lines = text.splitlines()
-    zh_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
+def extract_vocab(text: str) -> list[str]:
+    """Extract vocabulary words from markdown table (first column)."""
+    words = []
+    for line in text.splitlines():
+        # Match markdown table rows: | word | ...
+        if not line.strip().startswith("|"):
             continue
-        zh_count = sum(1 for c in stripped if '\u4e00' <= c <= '\u9fff')
-        total_alpha = sum(1 for c in stripped if c.isalpha() or '\u4e00' <= c <= '\u9fff')
-        if total_alpha == 0:
+        cols = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cols:
             continue
-        if zh_count / total_alpha >= 0.4:
-            zh_lines.append(stripped)
-    return "\n".join(zh_lines) if zh_lines else ""
+        word = cols[0].strip()
+        # Skip header/separator rows
+        if not word or word.startswith("-") or word.lower() in ("單字 / 片語", "word", "vocab"):
+            continue
+        # Keep only the base word (before space or /)
+        base = re.split(r'[/\s]', word)[0].strip()
+        if base and base.isascii() and base.replace("-", "").isalpha():
+            words.append(base)
+    return words[:8]  # max 8 buttons
 
 
 async def synthesize(text: str, voice: str = VOICE_FEMALE_EN, rate: str = RATE_NORMAL) -> bytes:

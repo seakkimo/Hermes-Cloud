@@ -135,6 +135,19 @@ def run_webhook():
         logger.info("Keep-alive ping received")
         return {"status": "alive"}
 
+    @web.get("/test_notify")
+    async def test_notify(x_scheduler_secret: str = Header(default="")):
+        if x_scheduler_secret != SCHEDULER_SECRET:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        try:
+            await tg_app.bot.send_message(
+                chat_id=TELEGRAM_OWNER_CHAT_ID,
+                text=f"✅ Hermes test notification\nOWNER_CHAT_ID={TELEGRAM_OWNER_CHAT_ID}",
+            )
+            return {"status": "ok", "chat_id": TELEGRAM_OWNER_CHAT_ID}
+        except Exception as e:
+            return {"status": "error", "chat_id": TELEGRAM_OWNER_CHAT_ID, "error": str(e)}
+
     @web.post("/task")
     async def task(request: Request, x_scheduler_secret: str = Header(default="")):
         if x_scheduler_secret != SCHEDULER_SECRET:
@@ -235,7 +248,7 @@ def run_webhook():
                     # TOEIC task: send text + TTS + inline buttons
                     if t["name"] == "toeic_exec":
                         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                        from src.tools.tts import synthesize, extract_english, VOICE_FEMALE_EN, RATE_NORMAL
+                        from src.tools.tts import synthesize, extract_article, extract_vocab, VOICE_FEMALE_EN, VOICE_MALE_EN, RATE_NORMAL, RATE_SLOW
                         import io
 
                         # 1. Send text
@@ -244,27 +257,44 @@ def run_webhook():
                             text=reply,
                             parse_mode="Markdown",
                         )
-                        # 2. Auto-send female voice (normal speed)
-                        en_text = extract_english(reply)
-                        audio = await synthesize(en_text, voice=VOICE_FEMALE_EN, rate=RATE_NORMAL)
-                        await tg_app.bot.send_voice(
-                            chat_id=TELEGRAM_OWNER_CHAT_ID,
-                            voice=io.BytesIO(audio),
-                            caption="🔊 Jenny（女聲）",
-                        )
-                        # 3. Inline buttons for other options
-                        keyboard = InlineKeyboardMarkup([[
-                            InlineKeyboardButton("👨 男聲", callback_data=f"tts|male|normal|{hash(en_text)}"),
-                            InlineKeyboardButton("🐢 慢速", callback_data=f"tts|female|slow|{hash(en_text)}"),
-                            InlineKeyboardButton("🇹🇼 中文解說", callback_data=f"tts|zh|normal|{hash(reply)}"),
-                        ]])
-                        # Store text in bot_data for callback retrieval
-                        tg_app.bot_data[f"tts_en_{hash(en_text)}"] = en_text
-                        tg_app.bot_data[f"tts_full_{hash(reply)}"] = reply
+
+                        # 2. Extract article sentence and auto-send female voice
+                        article = extract_article(reply)
+                        if article:
+                            audio = await synthesize(article, voice=VOICE_FEMALE_EN, rate=RATE_NORMAL)
+                            await tg_app.bot.send_voice(
+                                chat_id=TELEGRAM_OWNER_CHAT_ID,
+                                voice=io.BytesIO(audio),
+                                caption="🔊 Jenny（女聲）— 文章正常速",
+                            )
+
+                        # 3. Store texts for callbacks
+                        article_key = str(hash(article))
+                        full_key = str(hash(reply))
+                        tg_app.bot_data[f"tts_en_{article_key}"] = article
+                        tg_app.bot_data[f"tts_full_{full_key}"] = reply
+
+                        # 4. Build buttons: male + slow + vocab words + zh
+                        vocab = extract_vocab(reply)
+                        btn_rows = [[
+                            InlineKeyboardButton("👨 男聲", callback_data=f"tts|male|normal|{article_key}"),
+                            InlineKeyboardButton("🐢 慢速", callback_data=f"tts|female|slow|{article_key}"),
+                            InlineKeyboardButton("🇹🇼 中文解說", callback_data=f"tts|zh|normal|{full_key}"),
+                        ]]
+                        # Vocab word buttons (2 per row)
+                        word_row = []
+                        for w in vocab:
+                            word_row.append(InlineKeyboardButton(f"🔊 {w}", callback_data=f"tts|word|normal|{w}"))
+                            if len(word_row) == 2:
+                                btn_rows.append(word_row)
+                                word_row = []
+                        if word_row:
+                            btn_rows.append(word_row)
+
                         await tg_app.bot.send_message(
                             chat_id=TELEGRAM_OWNER_CHAT_ID,
-                            text="選擇其他播放選項：",
-                            reply_markup=keyboard,
+                            text="🎧 選擇播放選項：",
+                            reply_markup=InlineKeyboardMarkup(btn_rows),
                         )
                     else:
                         await tg_app.bot.send_message(

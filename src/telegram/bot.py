@@ -462,35 +462,50 @@ async def tts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if len(parts) != 4 or parts[0] != "tts":
         return
 
-    _, voice_type, speed, text_hash = parts
-    from src.tools.tts import synthesize, extract_chinese, VOICE_FEMALE_EN, VOICE_MALE_EN, VOICE_ZH, RATE_NORMAL, RATE_SLOW
+    _, voice_type, speed, payload = parts
+    from src.tools.tts import synthesize, VOICE_FEMALE_EN, VOICE_MALE_EN, VOICE_ZH, RATE_NORMAL, RATE_SLOW
 
-    # Retrieve stored text
-    if voice_type == "zh":
-        full_text = context.bot_data.get(f"tts_full_{text_hash}", "")
-        zh_text = extract_chinese(full_text)
-        if not zh_text:
-            await query.message.reply_text("⚠️ 找不到中文內容")
+    try:
+        await query.message.chat.send_action("record_voice")
+
+        # 單字發音
+        if voice_type == "word":
+            word = payload
+            audio = await synthesize(word, voice=VOICE_FEMALE_EN, rate=RATE_NORMAL)
+            await query.message.reply_voice(voice=io.BytesIO(audio), caption=f"🔊 {word}")
             return
-        tts_text = zh_text
-        voice = VOICE_ZH
-        rate = RATE_NORMAL
-        caption = "🇹🇼 中文解說（HsiaoChen）"
-    else:
-        tts_text = context.bot_data.get(f"tts_en_{text_hash}", "")
+
+        # 中文解說：LLM 先改寫成口語教學稿，再 TTS
+        if voice_type == "zh":
+            full_text = context.bot_data.get(f"tts_full_{payload}", "")
+            if not full_text:
+                await query.message.reply_text("⚠️ 內容已過期，請等待明日推送")
+                return
+            from src.llm.llm import chat
+            oral_script = await chat([
+                {"role": "system", "content": "你是一位活潑、親切的 TOEIC 英文老師，正在錄音課程。"},
+                {"role": "user", "content": (
+                    "請將以下 TOEIC 教學內容改寫成純口語說話稿，像老師對學生講解一樣。"
+                    "規則：1)只用繁體中文 2)不要念標點符號、Markdown、表格 3)英文單字請念出來 4)自然口語，像在課堂講話\n\n"
+                    f"{full_text}"
+                )},
+            ])
+            audio = await synthesize(oral_script, voice=VOICE_ZH, rate=RATE_NORMAL)
+            await query.message.reply_voice(voice=io.BytesIO(audio), caption="🇹🇼 中文解說（HsiaoChen 老師）")
+            return
+
+        # 英文文章播放（男聲 / 慢速）
+        tts_text = context.bot_data.get(f"tts_en_{payload}", "")
         if not tts_text:
             await query.message.reply_text("⚠️ 語音內容已過期，請等待明日推送")
             return
         voice = VOICE_MALE_EN if voice_type == "male" else VOICE_FEMALE_EN
         rate = RATE_SLOW if speed == "slow" else RATE_NORMAL
         name = "Guy（男聲）" if voice_type == "male" else "Jenny（女聲）"
-        speed_label = "🐢 慢速" if speed == "slow" else ""
-        caption = f"🔊 {name} {speed_label}".strip()
-
-    try:
-        await query.message.chat.send_action("record_voice")
+        speed_label = " 🐢慢速" if speed == "slow" else ""
         audio = await synthesize(tts_text, voice=voice, rate=rate)
-        await query.message.reply_voice(voice=io.BytesIO(audio), caption=caption)
+        await query.message.reply_voice(voice=io.BytesIO(audio), caption=f"🔊 {name}{speed_label}")
+
     except Exception as e:
         logger.error(f"TTS callback error: {e}")
         await query.message.reply_text("⚠️ 語音產生失敗")
