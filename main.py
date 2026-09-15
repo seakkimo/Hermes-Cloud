@@ -211,10 +211,13 @@ def run_webhook():
                 .execute()
             ).data or []
 
+            logger.info(f"Proactive slot={slot}, found {len(rows)} tasks, OWNER_ID={TELEGRAM_OWNER_CHAT_ID}")
+
             if not rows:
-                return {"status": "ok", "task": task_name, "slot": slot, "ran": 0}
+                return {"status": "ok", "task": task_name, "slot": slot, "ran": 0, "reason": f"no tasks for slot '{slot} UTC+8'"}
 
             ran = 0
+            errors = []
             for t in rows:
                 try:
                     if t["name"] == "weather":
@@ -272,7 +275,8 @@ def run_webhook():
                     ran += 1
                 except Exception as e:
                     logger.error(f"Proactive task '{t['name']}' error: {e}")
-            return {"status": "ok", "task": task_name, "slot": slot, "ran": ran}
+                    errors.append({"task": t["name"], "error": str(e)})
+            return {"status": "ok", "task": task_name, "slot": slot, "ran": ran, "errors": errors}
 
         return {"status": "ok", "task": task_name}
 
