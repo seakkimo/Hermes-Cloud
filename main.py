@@ -228,11 +228,47 @@ def run_webhook():
                         prompt = t["prompt"]
 
                     reply = await agent_run(prompt, user_id=TELEGRAM_OWNER_CHAT_ID)
-                    await tg_app.bot.send_message(
-                        chat_id=TELEGRAM_OWNER_CHAT_ID,
-                        text=reply,
-                        parse_mode="Markdown",
-                    )
+
+                    # TOEIC task: send text + TTS + inline buttons
+                    if t["name"] == "toeic_exec":
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        from src.tools.tts import synthesize, extract_english, VOICE_FEMALE_EN, RATE_NORMAL
+                        import io
+
+                        # 1. Send text
+                        await tg_app.bot.send_message(
+                            chat_id=TELEGRAM_OWNER_CHAT_ID,
+                            text=reply,
+                            parse_mode="Markdown",
+                        )
+                        # 2. Auto-send female voice (normal speed)
+                        en_text = extract_english(reply)
+                        audio = await synthesize(en_text, voice=VOICE_FEMALE_EN, rate=RATE_NORMAL)
+                        await tg_app.bot.send_voice(
+                            chat_id=TELEGRAM_OWNER_CHAT_ID,
+                            voice=io.BytesIO(audio),
+                            caption="🔊 Jenny（女聲）",
+                        )
+                        # 3. Inline buttons for other options
+                        keyboard = InlineKeyboardMarkup([[
+                            InlineKeyboardButton("👨 男聲", callback_data=f"tts|male|normal|{hash(en_text)}"),
+                            InlineKeyboardButton("🐢 慢速", callback_data=f"tts|female|slow|{hash(en_text)}"),
+                            InlineKeyboardButton("🇹🇼 中文解說", callback_data=f"tts|zh|normal|{hash(reply)}"),
+                        ]])
+                        # Store text in bot_data for callback retrieval
+                        tg_app.bot_data[f"tts_en_{hash(en_text)}"] = en_text
+                        tg_app.bot_data[f"tts_full_{hash(reply)}"] = reply
+                        await tg_app.bot.send_message(
+                            chat_id=TELEGRAM_OWNER_CHAT_ID,
+                            text="選擇其他播放選項：",
+                            reply_markup=keyboard,
+                        )
+                    else:
+                        await tg_app.bot.send_message(
+                            chat_id=TELEGRAM_OWNER_CHAT_ID,
+                            text=reply,
+                            parse_mode="Markdown",
+                        )
                     ran += 1
                 except Exception as e:
                     logger.error(f"Proactive task '{t['name']}' error: {e}")

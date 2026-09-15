@@ -1,7 +1,8 @@
 import base64
+import io
 import logging
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from config.settings import TELEGRAM_BOT_TOKEN, OPENROUTER_BASE_URL
 from src.agent.runtime import run
 from src.agent.session import get_model, set_model, AUTO_MODEL, get_search_engine, set_search_engine
@@ -452,6 +453,49 @@ async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(result, parse_mode="Markdown")
 
 
+async def tts_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle TTS inline button presses."""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("|")
+    if len(parts) != 4 or parts[0] != "tts":
+        return
+
+    _, voice_type, speed, text_hash = parts
+    from src.tools.tts import synthesize, extract_chinese, VOICE_FEMALE_EN, VOICE_MALE_EN, VOICE_ZH, RATE_NORMAL, RATE_SLOW
+
+    # Retrieve stored text
+    if voice_type == "zh":
+        full_text = context.bot_data.get(f"tts_full_{text_hash}", "")
+        zh_text = extract_chinese(full_text)
+        if not zh_text:
+            await query.message.reply_text("⚠️ 找不到中文內容")
+            return
+        tts_text = zh_text
+        voice = VOICE_ZH
+        rate = RATE_NORMAL
+        caption = "🇹🇼 中文解說（HsiaoChen）"
+    else:
+        tts_text = context.bot_data.get(f"tts_en_{text_hash}", "")
+        if not tts_text:
+            await query.message.reply_text("⚠️ 語音內容已過期，請等待明日推送")
+            return
+        voice = VOICE_MALE_EN if voice_type == "male" else VOICE_FEMALE_EN
+        rate = RATE_SLOW if speed == "slow" else RATE_NORMAL
+        name = "Guy（男聲）" if voice_type == "male" else "Jenny（女聲）"
+        speed_label = "🐢 慢速" if speed == "slow" else ""
+        caption = f"🔊 {name} {speed_label}".strip()
+
+    try:
+        await query.message.chat.send_action("record_voice")
+        audio = await synthesize(tts_text, voice=voice, rate=rate)
+        await query.message.reply_voice(voice=io.BytesIO(audio), caption=caption)
+    except Exception as e:
+        logger.error(f"TTS callback error: {e}")
+        await query.message.reply_text("⚠️ 語音產生失敗")
+
+
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle photo messages — send image + caption to Agent via vision model."""
     user_id = update.effective_user.id
@@ -527,6 +571,7 @@ def build_app():
     app.add_handler(CommandHandler("calendar", calendar_command))
     app.add_handler(CommandHandler("email", email_command))
     app.add_handler(CommandHandler("run", run_command))
+    app.add_handler(CallbackQueryHandler(tts_callback, pattern=r"^tts\|"))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
